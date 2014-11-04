@@ -271,6 +271,46 @@ atspi_component_grab_focus (AtspiComponent *obj, GError **error)
 }
 
 /**
+ * atspi_component_grab_highlight:
+ * @obj: a pointer to the #AtspiComponent on which to operate.
+ *
+ * Attempts to set highlight to the specified
+ *         #AtspiComponent.
+ *
+ * Returns: #TRUE if successful, #FALSE otherwise.
+ *
+ **/
+gboolean
+atspi_component_grab_highlight (AtspiComponent *obj, GError **error)
+{
+  dbus_bool_t retval = FALSE;
+
+  _atspi_dbus_call (obj, atspi_interface_component, "GrabHighlight", error, "=>b", &retval);
+
+  return retval;
+}
+
+/**
+ * atspi_component_clear_highlight:
+ * @obj: a pointer to the #AtspiComponent on which to operate.
+ *
+ * Attempts to clear highlight on the specified
+ *         #AtspiComponent.
+ *
+ * Returns: #TRUE if successful, #FALSE otherwise.
+ *
+ **/
+gboolean
+atspi_component_clear_highlight (AtspiComponent *obj, GError **error)
+{
+  dbus_bool_t retval = FALSE;
+
+  _atspi_dbus_call (obj, atspi_interface_component, "ClearHighlight", error, "=>b", &retval);
+
+  return retval;
+}
+
+/**
  * atspi_component_get_alpha:
  * @obj: The #AtspiComponent to be queried.
  *

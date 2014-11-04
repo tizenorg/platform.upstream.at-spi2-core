@@ -107,6 +107,10 @@ gboolean atspi_component_set_position (AtspiComponent *obj, gint x, gint y, Atsp
 
 gboolean atspi_component_set_size (AtspiComponent *obj, gint width, gint height, GError **error);
 
+gboolean atspi_component_grab_highlight (AtspiComponent *obj, GError **error);
+
+gboolean atspi_component_clear_highlight (AtspiComponent *obj, GError **error);
+
 G_END_DECLS
 
 #endif	/* _ATSPI_COMPONENT_H_ */

@@ -541,6 +541,30 @@ impl_GrabFocus (DBusConnection * bus, DBusMessage * message, void *user_data)
 }
 
 static DBusMessage *
+impl_ClearHighlight (DBusConnection * bus, DBusMessage * message, void *user_data)
+{
+  DBusMessage *reply;
+  dbus_bool_t retval = FALSE;
+
+  reply = dbus_message_new_method_return (message);
+  dbus_message_append_args (reply, DBUS_TYPE_BOOLEAN, &retval,
+                            DBUS_TYPE_INVALID);
+  return reply;
+}
+
+static DBusMessage *
+impl_GrabHighlight (DBusConnection * bus, DBusMessage * message, void *user_data)
+{
+  DBusMessage *reply;
+  dbus_bool_t retval = FALSE;
+
+  reply = dbus_message_new_method_return (message);
+  dbus_message_append_args (reply, DBUS_TYPE_BOOLEAN, &retval,
+                            DBUS_TYPE_INVALID);
+  return reply;
+}
+
+static DBusMessage *
 impl_GetAlpha (DBusConnection * bus, DBusMessage * message, void *user_data)
 {
   double rv = 1.0;
@@ -1247,6 +1271,10 @@ handle_method_root (DBusConnection *bus, DBusMessage *message, void *user_data)
           reply = impl_GetMDIZOrder (bus, message, user_data);
       else if (!strcmp (member, "GrabFocus"))
           reply = impl_GrabFocus (bus, message, user_data);
+      else if (!strcmp (member, "GrabHighlight"))
+          reply = impl_GrabHighlight (bus, message, user_data);
+      else if (!strcmp (member, "ClearHighlight"))
+          reply = impl_ClearHighlight (bus, message, user_data);
       else if (!strcmp (member, "GetAlpha"))
           reply = impl_GetAlpha (bus, message, user_data);
       else
