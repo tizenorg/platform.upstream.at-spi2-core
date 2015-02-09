@@ -257,7 +257,7 @@ remove_events (SpiRegistry *registry, const char *bus_name, const char *event)
     }
 
   if (!mouse_found)
-    spi_device_event_controller_stop_poll_mouse ();
+    spi_dec_stop_poll_mouse (registry->dec);
 
   g_strfreev (remove_data);
 
@@ -870,7 +870,7 @@ impl_register_event (DBusConnection *bus, DBusMessage *message, void *user_data)
 
   if (needs_mouse_poll (evdata->data))
     {
-      spi_device_event_controller_start_poll_mouse (registry);
+      spi_dec_start_poll_mouse (registry->dec);
     }
 
   signal = dbus_message_new_signal (SPI_DBUS_PATH_REGISTRY,

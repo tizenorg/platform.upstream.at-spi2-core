@@ -84,10 +84,9 @@ typedef struct
                        gboolean fix,
                        guint *modmask);
 
-  guint (*mouse_check) (SpiDEController *controller, 
-	                gint *x,
-	                gint *y,
-	                gboolean *moved);
+  void   (*start_poll_mouse) (SpiDEController *controller);
+
+  void   (*stop_poll_mouse) (SpiDEController *controller);
 
   gboolean (*register_global_keygrabs) (SpiDEController         *controller,
 					DEControllerKeyListener *key_listener);
@@ -144,8 +143,8 @@ SpiDEController *spi_device_event_controller_new      (SpiRegistry    *registry,
 
 gboolean spi_clear_error_state (void);
 
-void spi_device_event_controller_start_poll_mouse (SpiRegistry *registry);
-void spi_device_event_controller_stop_poll_mouse (void);
+void spi_dec_start_poll_mouse (SpiDEController *controller);
+void spi_dec_stop_poll_mouse (SpiDEController *controller);
 
 void spi_remove_device_listeners (SpiDEController *controller, const char *bus_name);
 

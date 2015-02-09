@@ -65,12 +65,7 @@ struct _SpiPoint {
 };
 typedef struct _SpiPoint SpiPoint;
 static unsigned int mouse_mask_state = 0;
-static unsigned int key_modifier_mask =
-  Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask | ShiftMask | LockMask | ControlMask | SPI_KEYMASK_NUMLOCK;
 static unsigned int _numlock_physical_mask = Mod2Mask; /* a guess, will be reset */
-
-static gboolean have_mouse_listener = FALSE;
-static gboolean have_mouse_event_listener = FALSE;
 
 
 typedef struct {
@@ -88,9 +83,6 @@ gboolean spi_controller_update_key_grabs               (SpiDEController         
 
 static gboolean eventtype_seq_contains_event (dbus_uint32_t types,
 					      const Accessibility_DeviceEvent *event);
-static gboolean spi_dec_poll_mouse_moving (gpointer data);
-static gboolean spi_dec_poll_mouse_idle (gpointer data);
-
 G_DEFINE_TYPE(SpiDEController, spi_device_event_controller, G_TYPE_OBJECT)
 
 static gint
@@ -106,18 +98,6 @@ spi_dec_plat_get_keycode (SpiDEController *controller,
     return klass->plat.get_keycode (controller, keysym, key_str, fix, modmask);
   else
     return keysym;
-}
-
-static guint
-spi_dec_plat_mouse_check (SpiDEController *controller, 
-		     int *x, int *y, gboolean *moved)
-{
-  SpiDEControllerClass *klass;
-  klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
-  if (klass->plat.mouse_check)
-    return klass->plat.mouse_check (controller, x, y, moved);
-  else
-    return 0;
 }
 
 static gboolean
@@ -198,16 +178,6 @@ spi_dec_plat_synth_keystring (SpiDEController *controller, guint synth_type, gin
 }
 
 static void
-spi_dec_plat_emit_modifier_event (SpiDEController *controller, guint prev_mask, 
-			     guint current_mask)
-{
-  SpiDEControllerClass *klass;
-  klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
-  if (klass->plat.emit_modifier_event)
-    klass->plat.emit_modifier_event (controller, prev_mask, current_mask);
-}
-
-static void
 spi_dec_plat_generate_mouse_event (SpiDEController *controller,
                                    gint x,
                                    gint y,
@@ -217,6 +187,24 @@ spi_dec_plat_generate_mouse_event (SpiDEController *controller,
   klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
   if (klass->plat.generate_mouse_event)
     klass->plat.generate_mouse_event (controller, x, y, eventName);
+}
+
+static void
+spi_dec_plat_start_mouse_poll (SpiDEController *controller)
+{
+  SpiDEControllerClass *klass;
+  klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
+  if (klass->plat.start_poll_mouse)
+    klass->plat.start_poll_mouse (controller);
+}
+
+static void
+spi_dec_plat_stop_mouse_poll (SpiDEController *controller)
+{
+  SpiDEControllerClass *klass;
+  klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
+  if (klass->plat.stop_poll_mouse)
+    klass->plat.stop_poll_mouse (controller);
 }
 
 DBusMessage *
@@ -349,58 +337,6 @@ spi_dec_dbus_emit (SpiDEController *controller, const char *interface,
 
   dbus_connection_send (controller->bus, signal, NULL);
   dbus_message_unref (signal);
-}
-
-static gboolean
-spi_dec_poll_mouse_moved (gpointer data)
-{
-  SpiDEController *controller = SPI_DEVICE_EVENT_CONTROLLER(data);
-  int x, y;
-  gboolean moved;
-  guint mask_return;
-
-  mask_return = spi_dec_plat_mouse_check (controller, &x, &y, &moved);
-
-  if ((mask_return & key_modifier_mask) !=
-      (mouse_mask_state & key_modifier_mask)) 
-    {
-      spi_dec_plat_emit_modifier_event (controller, mouse_mask_state, mask_return);
-      mouse_mask_state = mask_return;
-    }
-
-  return moved;
-}
-
-static gboolean
-spi_dec_poll_mouse_idle (gpointer data)
-{
-  if (!have_mouse_event_listener && !have_mouse_listener)
-    return FALSE;
-  else if (!spi_dec_poll_mouse_moved (data))
-    return TRUE;
-  else
-    {
-      guint id;
-      id = g_timeout_add (20, spi_dec_poll_mouse_moving, data);
-      g_source_set_name_by_id (id, "[at-spi2-core] spi_dec_poll_mouse_moving");
-      return FALSE;	    
-    }
-}
-
-static gboolean
-spi_dec_poll_mouse_moving (gpointer data)
-{
-  if (!have_mouse_event_listener && !have_mouse_listener)
-    return FALSE;
-  else if (spi_dec_poll_mouse_moved (data))
-    return TRUE;
-  else
-    {
-      guint id;
-      id = g_timeout_add (100, spi_dec_poll_mouse_idle, data);
-      g_source_set_name_by_id (id, "[at-spi2-core] check_release");
-      return FALSE;
-    }
 }
 
 /**
@@ -825,15 +761,7 @@ spi_controller_register_device_listener (SpiDEController      *controller,
       break;
   case SPI_DEVICE_TYPE_MOUSE:
       controller->mouse_listeners = g_list_prepend (controller->mouse_listeners, listener);
-      if (!have_mouse_listener)
-        {
-          have_mouse_listener = TRUE;
-          if (!have_mouse_event_listener) {
-            guint id;
-            id = g_timeout_add (100, spi_dec_poll_mouse_idle, controller);
-            g_source_set_name_by_id (id, "[at-spi2-core] spi_dec_poll_mouse_idle");
-          }
-        }
+      spi_dec_plat_start_mouse_poll (controller);
       spi_dbus_add_disconnect_match (controller->bus, listener->bus_name);
       notify_mouse_listener (controller, listener, TRUE);
       break;
@@ -1478,7 +1406,7 @@ spi_controller_deregister_device_listener (SpiDEController            *controlle
   spi_re_entrant_list_foreach (&controller->mouse_listeners,
 			       remove_listener_cb, &ctx);
   if (!controller->mouse_listeners)
-    have_mouse_listener = FALSE;
+    spi_dec_plat_stop_mouse_poll (controller);
 }
 
 static void
@@ -2024,21 +1952,13 @@ spi_registry_dec_new (SpiRegistry *reg, DBusConnection *bus)
 }
 
 void
-spi_device_event_controller_start_poll_mouse (SpiRegistry *registry)
+spi_dec_start_poll_mouse (SpiDEController *controller)
 {
-  if (!have_mouse_event_listener)
-    {
-      have_mouse_event_listener = TRUE;
-      if (!have_mouse_listener) {
-        guint id;
-        id = g_timeout_add (100, spi_dec_poll_mouse_idle, registry->dec);
-        g_source_set_name_by_id (id, "[at-spi2-core] spi_dec_poll_mouse_idle");
-      }
-    }
+  spi_dec_plat_start_mouse_poll (controller);
 }
 
 void
-spi_device_event_controller_stop_poll_mouse (void)
+spi_dec_stop_poll_mouse (SpiDEController *controller)
 {
-  have_mouse_event_listener = FALSE;
+  spi_dec_plat_stop_mouse_poll (controller);
 }

@@ -65,6 +65,9 @@
 
 #include "introspection.h"
 
+static gboolean have_mouse_listener = FALSE;
+static gboolean have_mouse_event_listener = FALSE;
+
 static void spi_dec_x11_emit_modifier_event (SpiDEController *controller,
 			     guint prev_mask,
 			     guint current_mask);
@@ -74,6 +77,7 @@ static void spi_dec_x11_emit_modifier_event (SpiDEController *controller,
 static guint check_release_handler = 0;
 static Accessibility_DeviceEvent pressed_event;
 static void wait_for_release_event (XEvent *event, SpiDEController *controller);
+static gboolean spi_dec_poll_mouse_moving (gpointer data);
 
 static int spi_error_code = 0;
 struct _SpiPoint {
@@ -1461,13 +1465,87 @@ spi_dec_x11_generate_mouse_event (SpiDEController *controller,
     }
 }
 
+static void
+spi_dec_plat_emit_modifier_event (SpiDEController *controller, guint prev_mask,
+			     guint current_mask)
+{
+  SpiDEControllerClass *klass;
+  klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
+  if (klass->plat.emit_modifier_event)
+    return klass->plat.emit_modifier_event (controller, prev_mask, current_mask);
+}
+
+static gboolean
+spi_dec_poll_mouse_moved (gpointer data)
+{
+  SpiDEController *controller = SPI_DEVICE_EVENT_CONTROLLER(data);
+  int x, y;
+  gboolean moved;
+  guint mask_return;
+
+  mask_return = spi_dec_x11_mouse_check (controller, &x, &y, &moved);
+
+  if ((mask_return & key_modifier_mask) !=
+      (mouse_mask_state & key_modifier_mask))
+    {
+      spi_dec_plat_emit_modifier_event (controller, mouse_mask_state, mask_return);
+      mouse_mask_state = mask_return;
+    }
+
+  return moved;
+}
+
+static gboolean
+spi_dec_poll_mouse_idle (gpointer data)
+{
+  if (!have_mouse_event_listener && !have_mouse_listener)
+    return FALSE;
+  else if (!spi_dec_poll_mouse_moved (data))
+    return TRUE;
+  else
+    {
+      g_timeout_add (20, spi_dec_poll_mouse_moving, data);
+      return FALSE;
+    }
+}
+
+static gboolean
+spi_dec_poll_mouse_moving (gpointer data)
+{
+  if (!have_mouse_event_listener && !have_mouse_listener)
+    return FALSE;
+  else if (spi_dec_poll_mouse_moved (data))
+    return TRUE;
+  else
+    {
+      g_timeout_add (100, spi_dec_poll_mouse_idle, data);
+      return FALSE;
+    }
+}
+
+static void
+spi_dec_x11_start_mouse_poll (SpiDEController *controller)
+{
+   if (!have_mouse_event_listener)
+     {
+        have_mouse_event_listener = TRUE;
+        if (!have_mouse_listener)
+          g_timeout_add (100, spi_dec_poll_mouse_idle, controller);
+     }
+}
+
+static void
+spi_dec_x11_stop_mouse_poll (SpiDEController *controller)
+{
+   have_mouse_event_listener = FALSE;
+}
+
 void
 spi_dec_setup_x11 (SpiDEControllerClass *klass)
 {
   GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
   klass->plat.get_keycode = spi_dec_x11_get_keycode;
-  klass->plat.mouse_check = spi_dec_x11_mouse_check;
   klass->plat.synth_keycode_press = spi_dec_x11_synth_keycode_press;
   klass->plat.synth_keycode_release = spi_dec_x11_synth_keycode_release;
   klass->plat.lock_modifiers = spi_dec_x11_lock_modifiers;
@@ -1477,6 +1555,8 @@ spi_dec_setup_x11 (SpiDEControllerClass *klass)
   klass->plat.ungrab_key = spi_dec_x11_ungrab_key;
   klass->plat.emit_modifier_event = spi_dec_x11_emit_modifier_event;
   klass->plat.generate_mouse_event = spi_dec_x11_generate_mouse_event;
+  klass->plat.start_poll_mouse = spi_dec_x11_start_mouse_poll;
+  klass->plat.stop_poll_mouse = spi_dec_x11_stop_mouse_poll;
 
   klass->plat.init = spi_dec_x11_init;
   klass->plat.finalize = spi_dec_x11_finalize;
