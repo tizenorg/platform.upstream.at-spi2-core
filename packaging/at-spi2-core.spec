@@ -1,4 +1,5 @@
 %define debug_package %{nil}
+%bcond_with x
 
 Name: at-spi2-core
 Version: 2_12_0
@@ -15,11 +16,14 @@ BuildRequires: python-xml
 BuildRequires: intltool
 BuildRequires: dbus-devel
 BuildRequires: glib2-devel
+BuildRequires: gettext
+BuildRequires: gtk-doc
+%if !%{with x}
+ExclusiveArch:
+%endif
 BuildRequires: libX11-devel
 BuildRequires: libXtst-devel
 BuildRequires: libXi-devel
-BuildRequires: gettext
-BuildRequires: gtk-doc
 
 %description
 AT-SPI is a general interface for applications to make use of the
