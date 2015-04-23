@@ -30,8 +30,9 @@
  * This software is in the public domain. Share and enjoy!
  *
  */
-
+#ifdef HAVE_X11
 #include <X11/X.h>
+#endif
 #include "deviceeventcontroller.h"	/* for prototype */
 
 struct codepair {
