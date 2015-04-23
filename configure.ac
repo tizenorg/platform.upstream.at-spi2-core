@@ -91,7 +91,7 @@ save_LIBS="$LIBS"
 LIBS=""
 CPPFLAGS="$CPPFLAGS $X_CFLAGS"
 AC_CHECK_LIB(Xtst, XTestFakeKeyEvent, XTST_LIBS=-lXtst,[
-	AC_MSG_ERROR([Couldn't find the Xtst library. Check config.log])],
+	AC_MSG_WARN([Couldn't find the Xtst library. Check config.log])],
 	$X_LIBS)
 AC_SUBST(XTST_LIBS)
 LIBS="$LIBS $save_LIBS"
@@ -117,7 +117,7 @@ if test "x$have_xinput" = "xmaybe"; then
 	LIBS="$save_LIBS"
 fi
 if test "x$have_xinput" != "xyes"; then
-	AC_MSG_ERROR([Couldn't find the XInput library. Check config.log for details])
+	AC_MSG_WARN([Couldn't find the XInput library. Check config.log for details])
 fi
 XINPUT_LIBS="-lXi"
 AC_SUBST(XINPUT_LIBS)

@@ -18,12 +18,11 @@ BuildRequires: dbus-devel
 BuildRequires: glib2-devel
 BuildRequires: gettext
 BuildRequires: gtk-doc
-%if !%{with x}
-ExclusiveArch:
-%endif
+%if %{with x}
 BuildRequires: libX11-devel
 BuildRequires: libXtst-devel
 BuildRequires: libXi-devel
+%endif
 
 %description
 AT-SPI is a general interface for applications to make use of the
@@ -70,6 +69,9 @@ cp %{SOURCE1001} .
 %build
 %autogen --libexecdir=%{_libexecdir}/at-spi2 \
         --with-dbus-daemondir=%{_bindir} \
+%if !%{with x}
+        --disable-x11 \
+%endif
         --disable-static
 %__make %{?_smp_flags}
 

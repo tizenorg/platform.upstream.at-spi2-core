@@ -42,8 +42,10 @@
 #include "keymasks.h"
 #include "de-types.h"
 #include "de-marshaller.h"
+#ifdef HAVE_X11
 #include "display.h"
 #include "event-source.h"
+#endif
 
 #include "deviceeventcontroller.h"
 #include "reentrant-list.h"
@@ -65,9 +67,14 @@ struct _SpiPoint {
 };
 typedef struct _SpiPoint SpiPoint;
 static unsigned int mouse_mask_state = 0;
+#ifdef HAVE_X11
 static unsigned int key_modifier_mask =
   Mod1Mask | Mod2Mask | Mod3Mask | Mod4Mask | Mod5Mask | ShiftMask | LockMask | ControlMask | SPI_KEYMASK_NUMLOCK;
 static unsigned int _numlock_physical_mask = Mod2Mask; /* a guess, will be reset */
+#else
+static unsigned int key_modifier_mask = 255;
+static unsigned int _numlock_physical_mask = (1<<4);
+#endif
 
 static gboolean have_mouse_listener = FALSE;
 static gboolean have_mouse_event_listener = FALSE;
@@ -632,7 +639,12 @@ handle_keygrab (SpiDEController         *controller,
   grab_mask.mod_mask = key_listener->mask;
   if (g_slist_length (key_listener->keys) == 0) /* special case means AnyKey/AllKeys */
     {
+#ifdef HAVE_X11
       grab_mask.key_val = AnyKey;
+#else
+      grab_mask.key_val = 0L;
+#endif
+
 #ifdef SPI_DEBUG
       fprintf (stderr, "AnyKey grab!");
 #endif
@@ -1749,7 +1761,11 @@ impl_generate_keyboard_event (DBusConnection *bus, DBusMessage *message, void *u
 	       * in our arg list; it can contain either
 	       * a keycode or a keysym.
 	       */
+#ifdef HAVE_X11
 	      spi_dec_synth_keysym (controller, (KeySym) keycode);
+#else
+	      spi_dec_synth_keysym (controller, (long) keycode);
+#endif
 	      break;
       case Accessibility_KEY_STRING:
 	      if (!spi_dec_plat_synth_keystring (controller, synth_type, keycode, keystring))

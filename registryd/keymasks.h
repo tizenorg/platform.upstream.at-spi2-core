@@ -24,7 +24,10 @@
 #ifndef SPI_KEYMASKS_H_
 #define SPI_KEYMASKS_H_
 
+
+#ifdef HAVE_X11
 #include <X11/Xlib.h>
+#endif
 #include <glib.h>
 
 G_BEGIN_DECLS
