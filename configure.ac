@@ -56,6 +56,17 @@ PKG_CHECK_MODULES(GIO, [gio-2.0 >= 2.28])
 AC_SUBST(GIO_LIBS)
 AC_SUBST(GIO_CFLAGS)
 
+PKG_CHECK_MODULES(APPSVC, [appsvc])
+AC_SUBST(APPSVC_LIBS)
+AC_SUBST(APPSVC_CFLAGS)
+
+PKG_CHECK_MODULES(VCONF, [vconf])
+AC_SUBST(VCONF_LIBS)
+AC_SUBST(VCONF_CFLAGS)
+
+PKG_CHECK_MODULES(AUL, [aul])
+AC_SUBST(AUL_LIBS)
+AC_SUBST(AUL_CFLAGS)
 # --------------------------------------------------------------------
 # Find DL functionality
 

@@ -35,6 +35,12 @@
 #include <X11/Xatom.h>
 #endif
 
+#define APP_CONTROL_OPERATION_SCREEN_READ "http://tizen.org/appcontrol/operation/read_screen"
+#include <appsvc.h>
+#include <vconf.h>
+#include <dlog.h>
+#include <aul.h>
+
 typedef enum {
   A11Y_BUS_STATE_IDLE = 0,
   A11Y_BUS_STATE_READING_ADDRESS,
@@ -51,7 +57,11 @@ typedef struct {
   GSettings *a11y_schema;
   GSettings *interface_schema;
 
+  gboolean screen_reader_needed;
+  int pid;
+
   A11yBusState state;
+
   /* -1 == error, 0 == pending, > 0 == running */
   int a11y_bus_pid;
   char *a11y_bus_address;
@@ -565,6 +575,70 @@ gsettings_key_changed (GSettings *gsettings, const gchar *key, void *user_data)
     handle_screen_reader_enabled_change (_global_app, new_val, FALSE);
 }
 
+static gboolean
+_launch_screen_reader(A11yBusLauncher *bl)
+{
+   bundle *kb = NULL;
+   gboolean ret = FALSE;
+
+   kb = bundle_create();
+   if (kb == NULL)
+     return FALSE;
+
+   appsvc_set_operation(kb, APP_CONTROL_OPERATION_SCREEN_READ);
+
+   bl->pid = appsvc_usr_run_service(kb, 0, NULL, NULL, getuid());
+   if (bl->pid >= 0) {
+       ret = TRUE;
+   }
+
+   bundle_free(kb);
+   return ret;
+}
+
+static gboolean
+_terminate_screen_reader(A11yBusLauncher *bl)
+{
+   int ret;
+   if (bl->pid <= 0)
+     return FALSE;
+
+   LOGD("terminate process with pid %d", bl->pid);
+   if (!aul_terminate_pid(bl->pid))
+     {
+        bl->pid = 0;
+        return TRUE;
+     }
+
+   LOGD("Unable to terminate process using aul api. Sending SIGTERM signal");
+   ret = kill(bl->pid, SIGTERM);
+   if (!ret)
+     {
+        bl->pid = 0;
+        return TRUE;
+     }
+
+   LOGD("Unable to terminate process: %d with api or signal.", bl->pid);
+   return FALSE;
+}
+
+void screen_reader_cb(keynode_t *node, void *user_data)
+{
+   A11yBusLauncher *bl = user_data;
+   int ret;
+
+   ret = vconf_keynode_get_bool(node);
+   if (ret < 0)
+     return;
+
+   bl->screen_reader_needed = ret;
+
+   if (!bl->screen_reader_needed && (bl->pid > 0))
+     _terminate_screen_reader(bl);
+   else if (bl->screen_reader_needed && (bl->pid <= 0))
+     _launch_screen_reader(bl);
+}
+
 int
 main (int    argc,
       char **argv)
@@ -636,6 +710,21 @@ main (int    argc,
                                   on_name_lost,
                                   _global_app,
                                   NULL);
+
+  int ret = vconf_get_bool("db/menu/accessibility/screen_reader", &_global_app->screen_reader_needed);
+  if (ret != 0)
+    {
+      LOGD("Could not read 'db/menu/accessibility/screen_reader' key value.\n");
+      return FALSE;
+    }
+  ret = vconf_notify_key_changed("db/menu/accessibility/screen_reader", screen_reader_cb, _global_app);
+  if(ret != 0)
+    {
+      LOGD("Could not add information level callback\n");
+      return FALSE;
+    }
+  if (_global_app->screen_reader_needed)
+    _launch_screen_reader(_global_app);
 
   g_main_loop_run (_global_app->loop);
 

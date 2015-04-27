@@ -24,6 +24,11 @@ ExclusiveArch:
 BuildRequires: libX11-devel
 BuildRequires: libXtst-devel
 BuildRequires: libXi-devel
+BuildRequires: libXi-devel
+BuildRequires: pkgconfig(vconf)
+BuildRequires: pkgconfig(appsvc)
+BuildRequires: pkgconfig(dlog)
+BuildRequires: pkgconfig(aul)
 
 %description
 AT-SPI is a general interface for applications to make use of the

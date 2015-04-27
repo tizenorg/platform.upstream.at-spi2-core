@@ -7,8 +7,8 @@ libexec_PROGRAMS = at-spi-bus-launcher
 at_spi_bus_launcher_SOURCES = at-spi-bus-launcher.c
 at_spi_bus_launcher_CPPFLAGS = -DSYSCONFDIR=\"$(sysconfdir)\" \
                                -DDBUS_DAEMON=\"$(DBUS_DAEMON)\"
-at_spi_bus_launcher_CFLAGS = $(GIO_CFLAGS)
-at_spi_bus_launcher_LDADD = $(GIO_LIBS) $(X_LIBS)
+at_spi_bus_launcher_CFLAGS = $(GIO_CFLAGS) $(APPSVC_CFLAGS) $(VCONF_CFLAGS) $(AUL_CFLAGS)
+at_spi_bus_launcher_LDADD = $(GIO_LIBS) $(X_LIBS) $(APPSVC_LIBS) $(VCONF_LIBS) $(AUL_LIBS)
 
 default_sessiondir = $(sysconfdir)/xdg/autostart
 default_session_DATA = at-spi-dbus-bus.desktop
