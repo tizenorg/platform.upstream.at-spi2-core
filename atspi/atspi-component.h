@@ -111,6 +111,8 @@ gboolean atspi_component_grab_highlight (AtspiComponent *obj, GError **error);
 
 gboolean atspi_component_clear_highlight (AtspiComponent *obj, GError **error);
 
+int atspi_component_get_highlight_index(AtspiComponent *obj, GError **error);
+
 G_END_DECLS
 
 #endif	/* _ATSPI_COMPONENT_H_ */

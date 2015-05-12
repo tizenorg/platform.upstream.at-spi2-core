@@ -452,6 +452,23 @@ atspi_component_set_size (AtspiComponent *obj,
   return ret;
 }
 
+/**
+ * atspi_component_get_highlight_index
+ * @obj: a pointer to the #AtspiComponent to query.
+ *
+ * Returns: highlight index of object if (>0), 0 if highlight index is not set
+ *          or -1 if an error occured.
+ **/
+int
+atspi_component_get_highlight_index (AtspiComponent *obj, GError **error)
+{
+   gint ret = -1;
+   g_return_val_if_fail (obj != NULL, -1);
+   _atspi_dbus_get_property (obj, atspi_interface_component,
+                             "HighlightIndex", error, "i", &ret);
+   return ret;
+}
+
 static void
 atspi_component_base_init (AtspiComponent *klass)
 {
