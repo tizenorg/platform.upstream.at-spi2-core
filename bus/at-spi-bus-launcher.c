@@ -57,7 +57,7 @@ typedef struct {
   GSettings *a11y_schema;
   GSettings *interface_schema;
 
-  gboolean screen_reader_needed;
+  int screen_reader_needed;
   int pid;
 
   A11yBusState state;
@@ -625,7 +625,7 @@ void screen_reader_cb(keynode_t *node, void *user_data)
    A11yBusLauncher *bl = user_data;
    int ret;
 
-   ret = vconf_keynode_get_bool(node);
+   ret = vconf_keynode_get_int(node);
    if (ret < 0)
      return;
 
