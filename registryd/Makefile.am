@@ -1,6 +1,8 @@
 libexec_PROGRAMS = at-spi2-registryd
 
+at_spi2_registryd_LDFLAGS = -pie
 at_spi2_registryd_CFLAGS =	\
+	-fPIE \
 	$(GLIB_CFLAGS)		\
 	$(GIO_CFLAGS)		\
 	$(DBUS_CFLAGS)	\
