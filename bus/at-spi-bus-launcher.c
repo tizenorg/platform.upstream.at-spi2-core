@@ -601,6 +601,16 @@ _terminate_screen_reader(A11yBusLauncher *bl)
    if (bl->pid <= 0)
      return FALSE;
 
+
+   int status = aul_app_get_status_bypid(bl->pid);
+
+   if (status < 0)
+     {
+	LOGD("App with pid %d already terminated", bl->pid);
+	bl->pid = 0;
+	return TRUE;
+     }
+
    LOGD("terminate process with pid %d", bl->pid);
    if (!aul_terminate_pid(bl->pid))
      {
