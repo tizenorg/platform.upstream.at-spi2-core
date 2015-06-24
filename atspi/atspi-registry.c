@@ -270,7 +270,7 @@ atspi_deregister_keystroke_listener (AtspiDeviceListener *listener,
                                      GError             **error)
 {
   GArray *d_key_set;
-  gchar *path = _atspi_device_listener_get_path (listener);
+  gchar *path;
   gint i;
   dbus_uint32_t d_modmask = modmask;
   dbus_uint32_t d_event_types = event_types;
@@ -282,6 +282,7 @@ atspi_deregister_keystroke_listener (AtspiDeviceListener *listener,
     {
       return FALSE;
     }
+  path = _atspi_device_listener_get_path (listener);
 
   /* copy the keyval filter values from the C api into the DBind KeySet */
   if (key_set)
@@ -363,7 +364,7 @@ atspi_register_device_event_listener (AtspiDeviceListener  *listener,
 {
   gboolean                          retval = FALSE;
   dbus_uint32_t d_event_types = event_types;
-  gchar *path = _atspi_device_listener_get_path (listener);
+  gchar *path;
   DBusError d_error;
 
   dbus_error_init (&d_error);
@@ -371,6 +372,7 @@ atspi_register_device_event_listener (AtspiDeviceListener  *listener,
     {
       return retval;
     }
+  path = _atspi_device_listener_get_path (listener);
 
     dbind_method_call_reentrant (_atspi_bus(), atspi_bus_registry, atspi_path_dec, atspi_interface_dec, "RegisterDeviceEventListener", &d_error, "ou=>b", path, d_event_types, &retval);
     if (dbus_error_is_set (&d_error))
@@ -400,7 +402,7 @@ atspi_deregister_device_event_listener (AtspiDeviceListener *listener,
 				   void                     *filter, GError **error)
 {
   dbus_uint32_t event_types = 0;
-  gchar *path = _atspi_device_listener_get_path (listener);
+  gchar *path;
   DBusError d_error;
 
   dbus_error_init (&d_error);
@@ -409,6 +411,7 @@ atspi_deregister_device_event_listener (AtspiDeviceListener *listener,
     {
       return FALSE;
     }
+  path = _atspi_device_listener_get_path (listener);
 
   event_types |= (1 << ATSPI_BUTTON_PRESSED_EVENT);
   event_types |= (1 << ATSPI_BUTTON_RELEASED_EVENT);
