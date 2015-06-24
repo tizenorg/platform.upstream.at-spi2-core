@@ -951,16 +951,20 @@ _atspi_dbus_handle_event (DBusConnection *bus, DBusMessage *message, void *data)
 
   memset (&e, 0, sizeof (e));
 
-  if (category)
+  if (!category)
   {
-    category = g_utf8_strrchr (category, -1, '.');
-    if (category == NULL)
-    {
-      // TODO: Error
-      return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
-    }
-    category++;
+    // TODO: Error
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
   }
+
+  category = g_utf8_strrchr (category, -1, '.');
+  if (category == NULL)
+  {
+    // TODO: Error
+    return DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
+  }
+  category++;
+
   dbus_message_iter_get_basic (&iter, &detail);
   dbus_message_iter_next (&iter);
   dbus_message_iter_get_basic (&iter, &detail1);

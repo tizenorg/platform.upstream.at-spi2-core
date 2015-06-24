@@ -101,6 +101,7 @@ atspi_state_set_set_by_name (AtspiStateSet *set, const gchar *name, gboolean ena
   if (!value)
   {
     g_warning ("AT-SPI: Attempt to set unknown state '%s'", name);
+    return;
   }
 
   if (enabled)
