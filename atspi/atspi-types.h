@@ -50,6 +50,7 @@ typedef guint AtspiKeyMaskType;
 
 typedef guint AtspiKeyEventMask;
 typedef guint AtspiDeviceEventMask;
+typedef guint AtspiGestureStatesMask;
 
 // TODO: auto-generate the below structs
 typedef struct _AtspiDeviceEvent AtspiDeviceEvent;
@@ -88,6 +89,15 @@ struct _AtspiEvent
   AtspiAccessible  *source;
   gint         detail1;
   gint         detail2;
+  GValue any_data;
+};
+
+typedef struct _AtspiGestureEvent AtspiGestureEvent;
+struct _AtspiGestureEvent
+{
+  AtspiGestureType type;
+  AtspiGestureState state;
+  guint timestamp;
   GValue any_data;
 };
 

@@ -60,5 +60,18 @@
     <annotation name="com.trolltech.QtDBus.QtTypeName.In0" value="QSpiDeviceEvent"/>
   </method>
 
+  <method name="RegisterGestureListener">
+    <arg direction="in" name="listener" type="o"/>
+    <arg direction="in" name="gesture" type="u"/>
+    <arg direction="in" name="states" type="u"/>
+    <arg direction="out" type="b"/>
+  </method>
+
+  <method name="DeregisterGestureListener">
+    <arg direction="in" name="listener" type="o"/>
+    <arg direction="in" name="gesture" type="u"/>
+    <arg direction="in" name="states" type="u"/>
+  </method>
+
 </interface>
 </node>

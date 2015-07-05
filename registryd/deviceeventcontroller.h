@@ -33,6 +33,7 @@ typedef struct _SpiDEController SpiDEController;
 
 #include "registry.h"
 #include "de-types.h"
+#include "gesture-detector.h"
 
 G_BEGIN_DECLS
 
@@ -49,15 +50,18 @@ struct _SpiDEController {
 	SpiRegistry    *registry;
 	GList          *key_listeners;
 	GList          *mouse_listeners;
+	GList          *gesture_listeners;
 	GList          *keygrabs_list;
 	GQueue *message_queue;
 	guint message_queue_idle;
+	SpiGestureDetector *detector;
   gpointer priv;
 };
 
 typedef enum {
   SPI_DEVICE_TYPE_KBD,
   SPI_DEVICE_TYPE_MOUSE,
+  SPI_DEVICE_TYPE_GESTURE,
   SPI_DEVICE_TYPE_LAST_DEFINED
 } SpiDeviceTypeCategory;
 
@@ -71,10 +75,16 @@ typedef struct {
 typedef struct {
   DEControllerListener listener;
 
- GSList *keys;
+  GSList *keys;
   Accessibility_ControllerEventMask mask;
   Accessibility_EventListenerMode  *mode;	
 } DEControllerKeyListener;
+
+typedef struct {
+   DEControllerListener listener;
+   DBusConnection *conn;
+   GestureListener *gesture_listener;
+} DEControllerGestureListener;
 
 typedef struct
 {
@@ -87,6 +97,10 @@ typedef struct
   void   (*start_poll_mouse) (SpiDEController *controller);
 
   void   (*stop_poll_mouse) (SpiDEController *controller);
+
+  void   (*start_poll_touch) (SpiDEController *controller);
+
+  void   (*stop_poll_touch) (SpiDEController *controller);
 
   gboolean (*register_global_keygrabs) (SpiDEController         *controller,
 					DEControllerKeyListener *key_listener);
@@ -146,6 +160,9 @@ gboolean spi_clear_error_state (void);
 void spi_dec_start_poll_mouse (SpiDEController *controller);
 void spi_dec_stop_poll_mouse (SpiDEController *controller);
 
+void spi_dec_start_poll_touch (SpiDEController *controller);
+void spi_dec_stop_poll_touch (SpiDEController *controller);
+
 void spi_remove_device_listeners (SpiDEController *controller, const char *bus_name);
 
 SpiDEController *spi_registry_dec_new (SpiRegistry *reg, DBusConnection *bus);
@@ -153,6 +170,10 @@ SpiDEController *spi_registry_dec_new (SpiRegistry *reg, DBusConnection *bus);
 gboolean
 spi_controller_notify_mouselisteners (SpiDEController                 *controller,
 				      const Accessibility_DeviceEvent *event);
+
+gboolean
+spi_controller_notify_touchlisteners (SpiDEController                 *controller,
+				      const Accessibility_TouchEvent *event);
 
 gboolean
 spi_controller_notify_keylisteners (SpiDEController                 *controller,

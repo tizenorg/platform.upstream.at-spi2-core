@@ -100,3 +100,63 @@ dbus_bool_t spi_dbus_demarshal_deviceEvent(DBusMessage *message, Accessibility_D
   e->modifiers = modifiers;
   return TRUE;
 }
+
+dbus_bool_t spi_dbus_marshal_gestureEvent(DBusMessage *message, const Accessibility_GestureEvent *e)
+{
+  DBusMessageIter iter, variant, iter_struct;
+  Accessibility_GestureTapData *td;
+  Accessibility_GestureFlickData *fd;
+
+  if (!message) return FALSE;
+  dbus_message_iter_init_append (message, &iter);
+
+  dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32, &e->type);
+  dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32, &e->states);
+  dbus_message_iter_append_basic (&iter, DBUS_TYPE_UINT32, &e->timestamp);
+
+  switch (e->type)
+    {
+     case Accessibility_GESTURE_N_FINGERS_LONGPRESS_HOLD:
+     case Accessibility_GESTURE_N_FINGERS_SINGLE_TAP:
+     case Accessibility_GESTURE_N_FINGERS_DOUBLE_TAP:
+     case Accessibility_GESTURE_N_FINGERS_TRIPLE_TAP:
+        dbus_message_iter_open_container (&iter, DBUS_TYPE_VARIANT, "(iiii)", &variant);
+        dbus_message_iter_open_container (&variant, DBUS_TYPE_STRUCT, NULL, &iter_struct);
+        td = e->gesture_info;
+        if (td)
+          {
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &td->n_fingers);
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &td->n_taps);
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &td->x);
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &td->y);
+          }
+        dbus_message_iter_close_container (&variant, &iter_struct);
+        break;
+     case Accessibility_GESTURE_N_FINGERS_FLICK:
+        dbus_message_iter_open_container (&iter, DBUS_TYPE_VARIANT, "(uiiiii)", &variant);
+        dbus_message_iter_open_container (&variant, DBUS_TYPE_STRUCT, NULL, &iter_struct);
+        fd = e->gesture_info;
+        if (fd)
+          {
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_UINT32, &fd->direction);
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &fd->x1);
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &fd->y1);
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &fd->x2);
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &fd->y2);
+             dbus_message_iter_append_basic (&iter_struct, DBUS_TYPE_INT32, &fd->n_fingers);
+          }
+        dbus_message_iter_close_container (&variant, &iter_struct);
+        break;
+     default:
+        return FALSE;
+    }
+  dbus_message_iter_close_container (&iter, &variant);
+  return TRUE;
+}
+
+dbus_bool_t spi_dbus_demarshal_gestureEvent(DBusMessage *message, Accessibility_GestureEvent *e)
+{
+  if (!message) return FALSE;
+
+  return TRUE;
+}

@@ -49,7 +49,8 @@ atspi-gmain.h \
 	atspi-table-cell.h \
 	atspi-text.h \
 	atspi-types.h \
-	atspi-value.h
+	atspi-value.h \
+	atspi-gesture-listener.h
 
 libatspi_la_SOURCES =		\
 	$(BUILT_SOURCES) \
@@ -107,7 +108,9 @@ libatspi_la_SOURCES =		\
 	atspi-text.h \
 	atspi-types.h \
 	atspi-value.c \
-	atspi-value.h
+	atspi-value.h \
+	atspi-gesture-listener.c \
+	atspi-gesture-listener.h
 
 BUILT_SOURCES = \
 	atspi-enum-types.c \

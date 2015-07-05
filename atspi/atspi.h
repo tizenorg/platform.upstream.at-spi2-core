@@ -49,6 +49,7 @@
 #include "atspi-table-cell.h"
 #include "atspi-text.h"
 #include "atspi-value.h"
+#include "atspi-gesture-listener.h"
 
 #include "atspi-gmain.h"
 

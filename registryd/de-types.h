@@ -29,6 +29,12 @@
 
 typedef unsigned long Accessibility_ControllerEventMask;
 
+struct _SpiPoint {
+    gint x;
+    gint y;
+};
+typedef struct _SpiPoint SpiPoint;
+
 typedef enum {
     Accessibility_KEY_PRESSED_EVENT,
     Accessibility_KEY_RELEASED_EVENT,
@@ -40,6 +46,12 @@ typedef enum {
     Accessibility_KEY_PRESSED,
     Accessibility_KEY_RELEASED,
 } Accessibility_KeyEventType;
+
+typedef enum {
+    Accessibility_TOUCH_DOWN,
+    Accessibility_TOUCH_MOVE,
+    Accessibility_TOUCH_UP,
+} Accessibility_TouchEventType;
 
 typedef enum {
     Accessibility_KEY_PRESS,
@@ -61,6 +73,15 @@ struct _Accessibility_DeviceEvent
   dbus_bool_t is_text;
 };
 
+typedef struct _Accessibility_TouchEvent Accessibility_TouchEvent;
+struct _Accessibility_TouchEvent
+{
+   int device;
+   SpiPoint pos;
+   Accessibility_TouchEventType type;
+   unsigned int timestamp;
+};
+
 typedef struct _Accessibility_EventListenerMode Accessibility_EventListenerMode;
 struct _Accessibility_EventListenerMode
 {
@@ -76,6 +97,58 @@ struct _Accessibility_KeyDefinition
   dbus_int32_t keysym;
   char *keystring;
   dbus_int32_t unused;
+};
+
+typedef enum {
+   Accessibility_GESTURE_N_FINGERS_LONGPRESS_HOLD,
+   Accessibility_GESTURE_N_FINGERS_SINGLE_TAP,
+   Accessibility_GESTURE_N_FINGERS_DOUBLE_TAP,
+   Accessibility_GESTURE_N_FINGERS_TRIPLE_TAP,
+   Accessibility_GESTURE_N_FINGERS_FLICK,
+   Accessibility_GESTURE_N_FINGERS_FLICK_RETURN,
+   Accessibility_GESTURE_LAST_DEFINED
+} Accessibility_GestureType;
+
+typedef enum {
+   Accessibility_GESTURE_STATE_BEGIN     = (1 << 0),
+   Accessibility_GESTURE_STATE_CONTINUED = (1 << 1),
+   Accessibility_GESTURE_STATE_ENDED     = (1 << 2),
+   Accessibility_GESTURE_STATE_ABORTED   = (1 << 3)
+} Accessibility_GestureState;
+
+typedef enum {
+   Accessibility_GESTURE_DIRECTION_UNDEFINED,
+   Accessibility_GESTURE_DIRECTION_LEFT,
+   Accessibility_GESTURE_DIRECTION_RIGHT,
+   Accessibility_GESTURE_DIRECTION_UP,
+   Accessibility_GESTURE_DIRECTION_DOWN
+} Accessibility_GestureDirection;
+
+typedef struct _Accessibility_GestureEvent Accessibility_GestureEvent;
+struct _Accessibility_GestureEvent
+{
+   Accessibility_GestureType type;
+   int states;
+   unsigned int timestamp;
+   void *gesture_info;
+};
+
+typedef struct _Accessibility_GestureTapData Accessibility_GestureTapData;
+struct _Accessibility_GestureTapData
+{
+   gint n_fingers;
+   gint n_taps;
+   gint x, y;
+};
+
+typedef struct _Accessibility_GestureFlickData Accessibility_GestureFlickData;
+struct _Accessibility_GestureFlickData
+{
+   Accessibility_GestureDirection direction;
+   gint x1, y1;
+   gint x2, y2;
+   gint vx, vy;
+   gint n_fingers;
 };
 
 #endif /* SPI_DE_TYPES_H_ */

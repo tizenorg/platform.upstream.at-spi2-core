@@ -59,11 +59,6 @@ static SpiDEController *saved_controller;
 
 /* A pointer to our parent object class */
 static int spi_error_code = 0;
-struct _SpiPoint {
-    gint x;
-    gint y;
-};
-typedef struct _SpiPoint SpiPoint;
 static unsigned int mouse_mask_state = 0;
 static unsigned int _numlock_physical_mask = Mod2Mask; /* a guess, will be reset */
 
@@ -83,6 +78,9 @@ gboolean spi_controller_update_key_grabs               (SpiDEController         
 
 static gboolean eventtype_seq_contains_event (dbus_uint32_t types,
 					      const Accessibility_DeviceEvent *event);
+
+static void spi_controller_disable_gesture_detection (SpiDEController *controller);
+static void spi_controller_enable_gesture_detection (SpiDEController *controller);
 G_DEFINE_TYPE(SpiDEController, spi_device_event_controller, G_TYPE_OBJECT)
 
 static gint
@@ -205,6 +203,24 @@ spi_dec_plat_stop_mouse_poll (SpiDEController *controller)
   klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
   if (klass->plat.stop_poll_mouse)
     klass->plat.stop_poll_mouse (controller);
+}
+
+static void
+spi_dec_plat_start_touch_poll (SpiDEController *controller)
+{
+  SpiDEControllerClass *klass;
+  klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
+  if (klass->plat.start_poll_touch)
+    klass->plat.start_poll_touch (controller);
+}
+
+static void
+spi_dec_plat_stop_touch_poll (SpiDEController *controller)
+{
+  SpiDEControllerClass *klass;
+  klass = SPI_DEVICE_EVENT_CONTROLLER_GET_CLASS (controller);
+  if (klass->plat.stop_poll_touch)
+    klass->plat.stop_poll_touch (controller);
 }
 
 DBusMessage *
@@ -397,6 +413,60 @@ spi_dec_key_listener_new (const char *bus_name,
   return key_listener;	
 }
 
+static void
+spi_controller_notify_gesture_listeners(gpointer user_data, const Accessibility_GestureEvent *gesture_event)
+{
+  DEControllerGestureListener *gl = user_data;
+
+  DBusMessage *message = dbus_message_new_method_call(gl->listener.bus_name,
+                                                      gl->listener.path,
+                                                      SPI_DBUS_INTERFACE_DEVICE_EVENT_LISTENER,
+                                                      "NotifyGestureEvent");
+#if 0
+  GSList *l;
+  gboolean hung = FALSE;
+  for (l = hung_processes; l; l = l->next)
+  {
+    if (!strcmp (l->data, listener->bus_name))
+    {
+      dbus_message_set_no_reply (message, TRUE);
+      hung = TRUE;
+      break;
+    }
+  }
+#endif
+
+  if (spi_dbus_marshal_gestureEvent(message, gesture_event))
+  {
+#if 0
+    if (hung)
+    {
+      dbus_connection_send (controller->bus, message, NULL);
+      dbus_message_unref (message);
+      return FALSE;
+    }
+#endif
+    dbus_connection_send (gl->conn, message, NULL);
+  }
+  dbus_message_unref(message);
+}
+
+static DEControllerGestureListener*
+spi_dec_gesture_listener_new(DBusConnection *conn,
+                             const char *bus_name,
+                             const char *path,
+                             Accessibility_GestureType type,
+                             int states_mask)
+{
+   DEControllerGestureListener *gesture_listener = g_new0 (DEControllerGestureListener, 1);
+   gesture_listener->listener.bus_name = g_strdup(bus_name);
+   gesture_listener->listener.path = g_strdup(path);
+   gesture_listener->listener.type = SPI_DEVICE_TYPE_GESTURE;
+   gesture_listener->conn = conn;
+   gesture_listener->gesture_listener = spi_gesture_listener_new (type, states_mask, spi_controller_notify_gesture_listeners, gesture_listener);
+   return gesture_listener;
+}
+
 static DEControllerListener *
 spi_dec_listener_new (const char *bus_name,
 		      const char *path,
@@ -485,6 +555,15 @@ spi_key_listener_data_free (DEControllerKeyListener *key_listener)
 }
 
 static void
+spi_gesture_listener_data_free (DEControllerGestureListener *gesture_listener)
+{
+  g_free (gesture_listener->gesture_listener);
+  g_free (gesture_listener->listener.bus_name);
+  g_free (gesture_listener->listener.path);
+  g_free (gesture_listener);
+}
+
+static void
 spi_key_listener_clone_free (DEControllerKeyListener *clone)
 {
   spi_key_listener_data_free (clone);
@@ -503,6 +582,8 @@ spi_dec_listener_free (DEControllerListener    *listener)
 {
   if (listener->type == SPI_DEVICE_TYPE_KBD) 
     spi_key_listener_data_free ((DEControllerKeyListener *) listener);
+  if (listener->type == SPI_DEVICE_TYPE_GESTURE)
+    spi_gesture_listener_data_free ((DEControllerGestureListener *) listener);
   else
   {
     g_free (listener->bus_name);
@@ -875,6 +956,7 @@ send_and_allow_reentry (DBusConnection *bus, DBusMessage *message, int timeout, 
     dbus_pending_call_unref (pending);
     return reply;
 }
+
 static gboolean
 Accessibility_DeviceEventListener_NotifyEvent(SpiDEController *controller,
                                               SpiRegistry *registry,
@@ -1435,6 +1517,25 @@ spi_deregister_controller_key_listener (SpiDEController            *controller,
   spi_key_listener_clone_free ((DEControllerKeyListener *) ctx.listener);
 }
 
+static void
+spi_deregister_gesture_listener (SpiDEController               *controller,
+				 DEControllerGestureListener   *gesture_listener)
+{
+  RemoveListenerClosure  ctx;
+
+  ctx.bus = controller->bus;
+  ctx.listener = &gesture_listener->listener;
+
+  spi_gesture_detector_del_listener (controller->detector, gesture_listener->gesture_listener);
+  spi_re_entrant_list_foreach (&controller->gesture_listeners,
+                               remove_listener_cb, &ctx);
+  if (!controller->gesture_listeners)
+    {
+       spi_controller_disable_gesture_detection (controller);
+       spi_dec_plat_stop_touch_poll (controller);
+    }
+}
+
 void
 spi_remove_device_listeners (SpiDEController *controller, const char *bus_name)
 {
@@ -1459,6 +1560,16 @@ spi_remove_device_listeners (SpiDEController *controller, const char *bus_name)
       /* TODO: untangle the below line(s) */
       spi_deregister_controller_key_listener (controller, key_listener);
       tmp = controller->key_listeners;
+    }
+  }
+  for (l = controller->gesture_listeners; l; l = tmp)
+  {
+    DEControllerGestureListener *gesture_listener = l->data;
+    tmp = l->next;
+    if (!strcmp (gesture_listener->listener.bus_name, bus_name))
+    {
+      spi_deregister_gesture_listener (controller, gesture_listener);
+      tmp = controller->gesture_listeners;
     }
   }
 }
@@ -1763,6 +1874,114 @@ impl_notify_listeners_async (DBusConnection *bus, DBusMessage *message, void *us
 }
 
 static void
+register_gesture_listener (SpiDEController *controller, DEControllerGestureListener *glistener)
+{
+  controller->gesture_listeners = g_list_prepend (controller->gesture_listeners, glistener);
+  spi_dec_plat_start_touch_poll (controller);
+  spi_controller_enable_gesture_detection (controller);
+  spi_gesture_detector_add_listener (controller->detector, glistener->gesture_listener);
+}
+
+static DBusMessage *
+impl_register_gesture_listener (DBusConnection *bus, DBusMessage *message, void *user_data)
+{
+  SpiDEController *controller = SPI_DEVICE_EVENT_CONTROLLER(user_data);
+  DEControllerGestureListener *listener;
+  const char *path;
+  dbus_uint32_t gesture_types, gesture_states;
+  dbus_bool_t ret = TRUE;
+  DBusMessage *reply = NULL;
+
+  if (strcmp (dbus_message_get_signature (message), "ouu"))
+  {
+     g_warning ("Unknown message signature. Expected 'ouu', got '%s'", dbus_message_get_signature (message));
+     return invalid_arguments_error (message);
+  }
+
+  if (!dbus_message_get_args(message, NULL, DBUS_TYPE_OBJECT_PATH, &path, DBUS_TYPE_UINT32, &gesture_types,
+                             DBUS_TYPE_UINT32, &gesture_states, DBUS_TYPE_INVALID))
+  {
+     return invalid_arguments_error (message);
+  }
+
+  listener = spi_dec_gesture_listener_new (bus, dbus_message_get_sender(message), path, gesture_types, gesture_states);
+  register_gesture_listener (controller, listener);
+  spi_dbus_add_disconnect_match (controller->bus, listener->listener.bus_name);
+  reply = dbus_message_new_method_return (message);
+  if (reply)
+  {
+    dbus_message_append_args (reply, DBUS_TYPE_BOOLEAN, &ret, DBUS_TYPE_INVALID);
+  }
+  return reply;
+}
+
+static DBusMessage *
+impl_deregister_gesture_listener (DBusConnection *bus, DBusMessage *message, void *user_data)
+{
+  SpiDEController *controller = SPI_DEVICE_EVENT_CONTROLLER(user_data);
+  DBusMessage *reply;
+  GList *l, *tmp;
+  const char *sig;
+  const char *path, *bus_name;
+
+  bus_name = dbus_message_get_sender (message);
+  sig = dbus_message_get_signature(message);
+
+  if (!bus_name || !sig || strcmp (sig, "o"))
+    {
+       g_warning ("Recieved DeregisterGestureListener with wrong signature: '%s' != 'o", sig);
+       reply = dbus_message_new_error (message, "org.freedesktop.DBus.InvalidSignature", "Expected 'o' signature");
+       goto end;
+    }
+  if (!dbus_message_get_args(message, NULL, DBUS_TYPE_OBJECT_PATH, &path, DBUS_TYPE_INVALID))
+  {
+    reply = invalid_arguments_error (message);
+    goto end;
+  }
+
+  for (l = controller->gesture_listeners; l; l = tmp)
+  {
+    DEControllerGestureListener *gesture_listener = l->data;
+    tmp = l->next;
+    if (!strcmp (gesture_listener->listener.bus_name, bus_name) &&
+        !strcmp (gesture_listener->listener.path, path))
+    {
+      spi_deregister_gesture_listener (controller, gesture_listener);
+      tmp = controller->gesture_listeners;
+    }
+  }
+
+  reply = dbus_message_new_method_return (message);
+end:
+  return reply;
+}
+
+static void
+spi_controller_enable_gesture_detection (SpiDEController *controller)
+{
+   if (!controller->detector)
+     controller->detector = spi_gesture_detector_new ();
+}
+
+static void
+spi_controller_disable_gesture_detection (SpiDEController *controller)
+{
+   if (controller->detector)
+     g_object_unref (controller->detector);
+   controller->detector = NULL;
+}
+
+gboolean
+spi_controller_notify_touchlisteners (SpiDEController *controller,
+				      const Accessibility_TouchEvent *event)
+{
+   if (controller->detector)
+      spi_gesture_detector_feed_touch (controller->detector, event);
+
+   return TRUE;
+}
+
+static void
 spi_device_event_controller_class_init (SpiDEControllerClass *klass)
 {
   GObjectClass * object_class = (GObjectClass *) klass;
@@ -1868,6 +2087,10 @@ handle_dec_method_from_idle (DBusConnection *bus, DBusMessage *message, void *us
           reply = impl_notify_listeners_sync (bus, message, user_data);
       else if (!strcmp (member, "NotifyListenersAsync"))
           reply = impl_notify_listeners_async (bus, message, user_data);
+      else if (!strcmp (member, "RegisterGestureListener"))
+          reply = impl_register_gesture_listener (bus, message, user_data);
+      else if (!strcmp (member, "DeregisterGestureListener"))
+          reply = impl_deregister_gesture_listener (bus, message, user_data);
       else
           result = DBUS_HANDLER_RESULT_NOT_YET_HANDLED;
     }

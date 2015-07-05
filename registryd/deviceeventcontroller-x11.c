@@ -80,11 +80,6 @@ static void wait_for_release_event (XEvent *event, SpiDEController *controller);
 static gboolean spi_dec_poll_mouse_moving (gpointer data);
 
 static int spi_error_code = 0;
-struct _SpiPoint {
-    gint x;
-    gint y;
-};
-typedef struct _SpiPoint SpiPoint;
 static SpiPoint last_mouse_pos_static = {0, 0}; 
 static SpiPoint *last_mouse_pos = &last_mouse_pos_static;
 static unsigned int mouse_mask_state = 0;

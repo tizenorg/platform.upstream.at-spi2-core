@@ -22,7 +22,8 @@ at_spi2_registryd_LDADD =	\
 	$(SM_LIBS)		\
 	$(XTST_LIBS)		\
 	$(XEVIE_LIBS)		\
-	$(DL_LIBS)
+	$(DL_LIBS)		\
+	-lm
 
 at_spi2_registryd_SOURCES =	\
 	de-marshaller.h         \
@@ -39,7 +40,8 @@ at_spi2_registryd_SOURCES =	\
 	deviceeventcontroller.h	\
 	reentrant-list.c	\
 	reentrant-list.h	\
-	ucs2keysym.c
+	ucs2keysym.c\
+	gesture-detector.c
 
 X11_SOURCES = \
 	deviceeventcontroller-x11.c \

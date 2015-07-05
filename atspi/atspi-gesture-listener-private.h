@@ -2,9 +2,9 @@
  * AT-SPI - Assistive Technology Service Provider Interface
  * (Gnome Accessibility Project; http://developer.gnome.org/projects/gap)
  *
- * Copyright 2009  Codethink Ltd
- * Copyright 2001, 2002 Sun Microsystems Inc.,
- * Copyright 2001, 2002 Ximian, Inc.
+ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+ *
+ * Author : Lukasz Stanislawski <l.stanislaws@samsung.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,18 +22,19 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#ifndef SPI_DE_MARSHALLER_H_
-#define SPI_DE_MARSHALLER_H_
+#ifndef _ATSPI_GESTURE_LISTENER_PRIVATE_H_
+#define _ATSPI_GESTURE_LISTENER_PRIVATE_H_
 
-#include <dbus/dbus.h>
+#include "atspi-gesture-listener.h"
 
-#include "de-types.h"
+#include "dbus/dbus.h"
 
-dbus_bool_t spi_dbus_message_iter_get_struct(DBusMessageIter *iter, ...);
-dbus_bool_t spi_dbus_message_iter_append_struct(DBusMessageIter *iter, ...);
-dbus_bool_t spi_dbus_marshal_deviceEvent(DBusMessage *message, const Accessibility_DeviceEvent *e);
-dbus_bool_t spi_dbus_demarshal_deviceEvent(DBusMessage *message, Accessibility_DeviceEvent *e);
-dbus_bool_t spi_dbus_marshal_gestureEvent(DBusMessage *message, const Accessibility_GestureEvent *e);
-dbus_bool_t spi_dbus_demarshal_gestureEvent(DBusMessage *message, Accessibility_GestureEvent *e);
+G_BEGIN_DECLS
 
-#endif /* SPI_DE_MARSHALLER_H_ */
+DBusHandlerResult _atspi_dbus_handle_GestureEvent (DBusConnection *bus, DBusMessage *message, void *data);
+
+gchar *_atspi_gesture_listener_get_path (AtspiGestureListener *listener);
+
+G_END_DECLS
+
+#endif	/* _ATSPI_GESTURE_LISTENER_H_ */

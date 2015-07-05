@@ -27,6 +27,7 @@
 
 #include <config.h>
 #include "atspi-device-listener-private.h"
+#include "atspi-gesture-listener-private.h"
 #include "atspi-event-listener-private.h"
 #include "atspi-matchrule-private.h"
 #include "atspi-misc-private.h"

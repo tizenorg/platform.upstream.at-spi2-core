@@ -425,6 +425,85 @@ atspi_deregister_device_event_listener (AtspiDeviceListener *listener,
 }
 
 /**
+ * atspi_register_gesture_event_listener:
+ * @listener:  a pointer to the #AtspiGestureListener which requests
+ *             the events.
+ * @gesture_types: an #AtspiGestureType indicating which
+ *             types of gestures are requested
+ *             (%ATSPI_GESTURE_N_FINGES_SINGLE_TAP, etc.).
+ * @states: an #AtspiGestureStatesMask indicating which states of gestures
+ *          are requested.
+ * @error: (allow-none): a pointer to a %NULL #GError pointer, or %NULL
+ *
+ * Registers a listener for gesture events.
+ *
+ * Returns: %TRUE if successful, otherwise %FALSE.
+ **/
+gboolean
+atspi_register_gesture_event_listener (AtspiGestureListener  *listener,
+                                       AtspiGestureType gesture_type,
+                                       AtspiGestureStatesMask states,
+                                       GError **error)
+{
+  gboolean retval = FALSE;
+  dbus_uint32_t g_states = states;
+  dbus_uint32_t g_type = gesture_type;
+  gchar *path = _atspi_gesture_listener_get_path (listener);
+  DBusError d_error;
+
+  dbus_error_init (&d_error);
+  if (!listener)
+    {
+      return retval;
+    }
+
+    dbind_method_call_reentrant (_atspi_bus(), atspi_bus_registry, atspi_path_dec, atspi_interface_dec, "RegisterGestureListener", &d_error, "ouu=>b", path, g_type, g_states, &retval);
+    if (dbus_error_is_set (&d_error))
+      {
+        g_warning ("RegisterGestureListener failed: %s", d_error.message);
+        dbus_error_free (&d_error);
+      }
+
+  g_free (path);
+  return retval;
+}
+
+/**
+ * atspi_deregister_gesture_event_listener:
+ * @listener: a pointer to the #AtspiGestureListener for which
+ *            gestures are requested.
+ * @error: (allow-none): a pointer to a %NULL #GError pointer, or %NULL
+ *
+ * Removes a gesture listener from the registry's listener queue.
+ *
+ * Returns: %TRUE if successful, otherwise %FALSE.
+ **/
+gboolean
+atspi_deregister_gesture_event_listener (AtspiGestureListener *listener,
+                                         GError **error)
+{
+  gchar *path = _atspi_gesture_listener_get_path (listener);
+  DBusError d_error;
+
+  dbus_error_init (&d_error);
+
+  if (!listener)
+    {
+      return FALSE;
+    }
+
+  dbind_method_call_reentrant (_atspi_bus(), atspi_bus_registry, atspi_path_dec, atspi_interface_dec, "DeregisterGestureListener", &d_error, "o", path);
+  if (dbus_error_is_set (&d_error))
+    {
+      g_warning ("DeregisterGestureListener failed: %s", d_error.message);
+      dbus_error_free (&d_error);
+    }
+
+  g_free (path);
+  return TRUE;
+}
+
+/**
  * atspi_generate_keyboard_event:
  * @keyval: a #gint indicating the keycode or keysym of the key event
  *           being synthesized.

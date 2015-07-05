@@ -708,6 +708,11 @@ process_deferred_message (BusDataClosure *closure)
     _atspi_dbus_handle_DeviceEvent (closure->bus,
                                    closure->message, closure->data);
   }
+  if (dbus_message_is_method_call (closure->message, atspi_interface_device_event_listener, "NotifyGestureEvent"))
+  {
+    _atspi_dbus_handle_GestureEvent (closure->bus,
+                                     closure->message, closure->data);
+  }
   if (dbus_message_is_signal (closure->message, atspi_interface_cache, "AddAccessible"))
   {
     handle_add_accessible (closure->bus, closure->message, closure->data);
@@ -789,6 +794,10 @@ atspi_dbus_filter (DBusConnection *bus, DBusMessage *message, void *data)
     return defer_message (bus, message, data);
   }
   if (dbus_message_is_method_call (message, atspi_interface_device_event_listener, "NotifyEvent"))
+  {
+    return defer_message (bus, message, data);
+  }
+  if (dbus_message_is_method_call (message, atspi_interface_device_event_listener, "NotifyGestureEvent"))
   {
     return defer_message (bus, message, data);
   }

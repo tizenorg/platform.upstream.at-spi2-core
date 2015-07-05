@@ -8,5 +8,9 @@
     <arg direction="out" type="b"/>
   </method>
 
+  <method name="NotifyGestureEvent">
+    <arg direction="in" name="event" type="(uuuv)"/>
+  </method>
+
 </interface>
 </node>
