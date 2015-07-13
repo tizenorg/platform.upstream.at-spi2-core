@@ -711,13 +711,13 @@ main (int    argc,
                                   _global_app,
                                   NULL);
 
-  int ret = vconf_get_bool("db/menu/accessibility/screen_reader", &_global_app->screen_reader_needed);
+  int ret = vconf_get_bool(VCONFKEY_SETAPPL_ACCESSIBILITY_TTS, &_global_app->screen_reader_needed);
   if (ret != 0)
     {
-      LOGD("Could not read 'db/menu/accessibility/screen_reader' key value.\n");
+      LOGD("Could not read VCONFKEY_SETAPPL_ACCESSIBILITY_TTS key value.\n");
       return FALSE;
     }
-  ret = vconf_notify_key_changed("db/menu/accessibility/screen_reader", screen_reader_cb, _global_app);
+  ret = vconf_notify_key_changed(VCONFKEY_SETAPPL_ACCESSIBILITY_TTS, screen_reader_cb, _global_app);
   if(ret != 0)
     {
       LOGD("Could not add information level callback\n");
