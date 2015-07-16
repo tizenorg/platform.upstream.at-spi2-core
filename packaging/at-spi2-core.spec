@@ -5,7 +5,8 @@ Name: at-spi2-core
 Version: 2.16.0
 Release: 0
 Summary: Assistive Technology Service Provider Interface - D-Bus based implementation
-License: LGPL-2.0+
+#License: LGPL-2.0+
+License: %{_builddir}/%{buildsubdir}/COPYING
 Group: System/Libraries
 Url: http://www.gnome.org/
 Source: http://ftp.gnome.org/pub/GNOME/sources/at-spi2-core/2.16/%{name}-%{version}.tar.xz
@@ -86,8 +87,6 @@ find %{buildroot} -name '*.la' -or -name '*.a' | xargs rm -f
 %find_lang %{name}
 
 %check
-mkdir -p %{buildroot}/usr/share/license
-cp -f COPYING %{buildroot}/usr/share/license/%{name}
 
 %clean
 rm -fr %{buildroot}
@@ -100,14 +99,13 @@ rm -fr %{buildroot}
 %manifest %{name}.manifest
 %defattr(-,root,root)
 %doc AUTHORS README
-%license COPYING
+#%license COPYING
 %{_libexecdir}/at-spi2/at-spi-bus-launcher
 %{_libexecdir}/at-spi2/at-spi2-registryd
 %config %{_sysconfdir}/at-spi2/accessibility.conf
 %{_sysconfdir}/xdg/autostart/at-spi-dbus-bus.desktop
 %{_datadir}/dbus-1/accessibility-services/org.a11y.atspi.Registry.service
 %{_datadir}/dbus-1/services/org.a11y.Bus.service
-
 
 %files -n libatspi0
 %manifest %{name}.manifest
