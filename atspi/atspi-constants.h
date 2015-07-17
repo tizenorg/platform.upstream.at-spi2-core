@@ -570,6 +570,12 @@ typedef enum {
  * @ATSPI_STATE_READ_ONLY: Indicates that an object which is ENABLED and
  * SENSITIVE has a value which can be read, but not modified, by the
  * user. @Since: 2.16
+ * @ATSPI_STATE_HIGHLIGHTED: Indicates that an object which is HIGHLIGHTABLE
+ * has been graphically marked to assits visally impared users. Only one
+ * object per window can have ATSPI_STATE_HIGHLIGHTED  state.
+ * @ATSPI_STATE_HIGHLIGHTABLE: Indicates that an object can be graphically
+ * marked to assist visially impaired users.
+ * user. @Since: 2.16
  * @ATSPI_STATE_LAST_DEFINED: This value of the enumeration should not be used
  * as a parameter, it indicates the number of items in the #AtspiStateType
  * enumeration.
@@ -624,6 +630,8 @@ typedef enum {
     ATSPI_STATE_CHECKABLE,
     ATSPI_STATE_HAS_POPUP,
     ATSPI_STATE_READ_ONLY,
+    ATSPI_STATE_HIGHLIGHTED,
+    ATSPI_STATE_HIGHLIGHTABLE,
     ATSPI_STATE_LAST_DEFINED,
 } AtspiStateType;
 
