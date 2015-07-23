@@ -585,9 +585,7 @@ _launch_screen_reader(A11yBusLauncher *bl)
    if (kb == NULL)
      return FALSE;
 
-   appsvc_set_operation(kb, APP_CONTROL_OPERATION_SCREEN_READ);
-
-   bl->pid = appsvc_usr_run_service(kb, 0, NULL, NULL, getuid());
+   bl->pid = aul_launch_app("org.tizen.screen-reader", kb);
    if (bl->pid >= 0) {
        ret = TRUE;
    }
