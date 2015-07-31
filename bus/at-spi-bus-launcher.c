@@ -38,8 +38,32 @@
 #define APP_CONTROL_OPERATION_SCREEN_READ "http://tizen.org/appcontrol/operation/read_screen"
 #include <appsvc.h>
 #include <vconf.h>
+
+//uncomment if you want debug
+//#ifndef TIZEN_ENGINEER_MODE
+//#define TIZEN_ENGINEER_MODE
+//#endif
+#ifdef LOG_TAG
+#undef LOG_TAG
+#endif
+
+#define LOG_TAG "ATSPI_BUS_LAUNCHER"
+
 #include <dlog.h>
 #include <aul.h>
+
+//uncomment this if you want log suring startup
+//seems like dlog is not working at startup time
+#define ATSPI_BUS_LAUNCHER_LOG_TO_FILE
+
+#ifdef ATSPI_BUS_LAUNCHER_LOG_TO_FILE
+FILE *log_file;
+#ifdef LOGD
+#undef LOGD
+#endif
+#define LOGD(arg...) do {fprintf(log_file, ##arg);fprintf(log_file, "\n"); fflush(log_file);} while(0)
+#endif
+
 
 typedef enum {
   A11Y_BUS_STATE_IDLE = 0,
@@ -57,6 +81,7 @@ typedef struct {
   GSettings *a11y_schema;
   GSettings *interface_schema;
 
+  int launch_screen_reader_repeats;
   gboolean screen_reader_needed;
   int pid;
 
@@ -184,7 +209,7 @@ ensure_a11y_bus (A11yBusLauncher *app)
 
   app->state = A11Y_BUS_STATE_READING_ADDRESS;
   app->a11y_bus_pid = pid;
-  g_debug ("Launched a11y bus, child is %ld", (long) pid);
+  LOGD("Launched a11y bus, child is %ld", (long) pid);
   if (!unix_read_all_fd_to_string (app->pipefd[0], addr_buf, sizeof (addr_buf)))
     {
       app->a11y_launch_error_message = g_strdup_printf ("Failed to read address: %s", strerror (errno));
@@ -197,7 +222,7 @@ ensure_a11y_bus (A11yBusLauncher *app)
 
   /* Trim the trailing newline */
   app->a11y_bus_address = g_strchomp (g_strdup (addr_buf));
-  g_debug ("a11y bus address: %s", app->a11y_bus_address);
+  LOGD("a11y bus address: %s", app->a11y_bus_address);
 
 #ifdef HAVE_X11
   {
@@ -576,27 +601,67 @@ gsettings_key_changed (GSettings *gsettings, const gchar *key, void *user_data)
 }
 
 static gboolean
-_launch_screen_reader(A11yBusLauncher *bl)
+_launch_screen_reader(gpointer user_data)
 {
+   A11yBusLauncher *bl = user_data;
+   LOGD("Launching screen reader");
+
    bundle *kb = NULL;
    gboolean ret = FALSE;
 
    kb = bundle_create();
-   if (kb == NULL)
-     return FALSE;
 
-   bl->pid = aul_launch_app("org.tizen.screen-reader", kb);
-   if (bl->pid >= 0) {
-       ret = TRUE;
-   }
+   if (kb == NULL)
+     {
+        LOGD("Can't create bundle");
+        return FALSE;
+     }
+   int operation_error = appsvc_set_operation(kb, APP_CONTROL_OPERATION_SCREEN_READ);
+   LOGD("appsvc_set_operation: %i", operation_error);
+
+   bl->pid = appsvc_run_service(kb, 0, NULL, NULL);
+
+   if (bl->pid > 0)
+     {
+        LOGD("Screen reader launched with pid: %i", bl->pid);
+        ret = TRUE;
+     }
+   else
+     {
+        LOGD("Can't start screen-reader - error code: %i", bl->pid);
+     }
+
 
    bundle_free(kb);
    return ret;
 }
 
 static gboolean
+_launch_screen_reader_repeat_until_success(gpointer user_data) {
+    A11yBusLauncher *bl = user_data;
+
+    if (bl->launch_screen_reader_repeats > 100 || bl->pid > 0)
+      {
+         //do not try anymore
+         return FALSE;
+      }
+
+    gboolean ret = _launch_screen_reader(user_data);
+
+    if (ret)
+      {
+         //we managed to
+         bl->launch_screen_reader_repeats = 0;
+         return FALSE;
+      }
+    //try again
+    return TRUE;
+}
+
+static gboolean
 _terminate_screen_reader(A11yBusLauncher *bl)
 {
+   LOGD("Terminating screen reader");
    int ret;
    if (bl->pid <= 0)
      return FALSE;
@@ -606,9 +671,9 @@ _terminate_screen_reader(A11yBusLauncher *bl)
 
    if (status < 0)
      {
-	LOGD("App with pid %d already terminated", bl->pid);
-	bl->pid = 0;
-	return TRUE;
+       LOGD("App with pid %d already terminated", bl->pid);
+       bl->pid = 0;
+       return TRUE;
      }
 
    LOGD("terminate process with pid %d", bl->pid);
@@ -636,11 +701,12 @@ void screen_reader_cb(keynode_t *node, void *user_data)
    int ret;
 
    ret = vconf_keynode_get_bool(node);
+   LOGD("vconf_keynode_get_bool(node): %i", ret);
    if (ret < 0)
      return;
 
    bl->screen_reader_needed = ret;
-
+   LOGD("bl->screen_reader_needed: %i, bl->pid: %i", ret, bl->pid);
    if (!bl->screen_reader_needed && (bl->pid > 0))
      _terminate_screen_reader(bl);
    else if (bl->screen_reader_needed && (bl->pid <= 0))
@@ -651,6 +717,11 @@ int
 main (int    argc,
       char **argv)
 {
+#ifdef ATSPI_BUS_LAUNCHER_LOG_TO_FILE
+  log_file = fopen("/tmp/at-spi-bus-launcher.log", "a");
+#endif
+
+  LOGD("Starting atspi bus launcher");
   GError *error = NULL;
   GMainLoop *loop;
   GDBusConnection *session_bus;
@@ -660,10 +731,14 @@ main (int    argc,
   gint i;
 
   if (already_running ())
-    return 0;
+    {
+       LOGD("atspi bus launcher is already running");
+       return 0;
+    }
 
   _global_app = g_slice_new0 (A11yBusLauncher);
   _global_app->loop = g_main_loop_new (NULL, FALSE);
+  _global_app->launch_screen_reader_repeats = 0;
 
   for (i = 1; i < argc; i++)
     {
@@ -732,7 +807,7 @@ main (int    argc,
       return FALSE;
     }
   if (_global_app->screen_reader_needed)
-    _launch_screen_reader(_global_app);
+    g_timeout_add_seconds(2,_launch_screen_reader_repeat_until_success, _global_app);
 
   g_main_loop_run (_global_app->loop);
 
