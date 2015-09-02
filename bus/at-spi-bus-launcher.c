@@ -61,7 +61,7 @@ FILE *log_file;
 #ifdef LOGD
 #undef LOGD
 #endif
-#define LOGD(arg...) do {fprintf(log_file, ##arg);fprintf(log_file, "\n"); fflush(log_file);} while(0)
+#define LOGD(arg...) do {if (log_file) {fprintf(log_file, ##arg);fprintf(log_file, "\n"); fflush(log_file);}} while(0)
 #endif
 
 
