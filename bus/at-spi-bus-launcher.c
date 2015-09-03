@@ -705,6 +705,15 @@ void screen_reader_cb(keynode_t *node, void *user_data)
    if (ret < 0)
      return;
 
+   //check if process really exists (e.g didn't crash)
+   if (bl->pid > 0)
+     {
+        int err = kill(bl->pid,0);
+        //process doesn't exist
+        if (err == ESRCH)
+          bl->pid = 0;
+     }
+
    bl->screen_reader_needed = ret;
    LOGD("bl->screen_reader_needed: %i, bl->pid: %i", ret, bl->pid);
    if (!bl->screen_reader_needed && (bl->pid > 0))
