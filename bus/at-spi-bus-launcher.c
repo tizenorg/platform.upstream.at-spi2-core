@@ -633,8 +633,6 @@ _launch_screen_reader(gpointer user_data)
         LOGD("Can't start screen-reader - error code: %i", bl->pid);
      }
 
-
-   bundle_free(kb);
    return ret;
 }
 
