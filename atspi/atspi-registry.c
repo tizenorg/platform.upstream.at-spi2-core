@@ -178,7 +178,9 @@ unregister_listener (gpointer data, GObject *object)
  *             #atspi_register_keystroke_listener once for each
  *             combination.
  * @event_types: an #AtspiKeyMaskType mask indicating which
- *             types of key events are requested (%ATSPI_KEY_PRESSED etc.).
+ *             types of key events are requested. 0 means all event types,
+ *             other values shoud be converted to mask, for example:
+ *             1 << ATSPI_KEY_RELEASED_EVENT.
  * @sync_type: an #AtspiKeyListenerSyncType parameter indicating
  *             the behavior of the notification/listener transaction.
  * @error: (allow-none): a pointer to a %NULL #GError pointer, or %NULL
