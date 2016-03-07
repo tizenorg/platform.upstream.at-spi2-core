@@ -2,7 +2,7 @@
 %bcond_with x
 
 Name: at-spi2-core
-Version: 2.16.0
+Version: 2.16.1
 Release: 0
 Summary: Assistive Technology Service Provider Interface - D-Bus based implementation
 License: LGPL-2.0+
