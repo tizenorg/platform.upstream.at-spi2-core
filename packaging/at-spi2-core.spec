@@ -84,8 +84,6 @@ rm -rf %{buildroot}
 find %{buildroot} -name '*.la' -or -name '*.a' | xargs rm -f
 %make_install
 %find_lang %{name}
-mkdir -p %{buildroot}/%{_datadir}/usr/share/license
-cp -f %{_builddir}/%{buildsubdir}/COPYING %{buildroot}/%{_datadir}/usr/share/license/%{name}
 
 %check
 
@@ -100,14 +98,13 @@ rm -fr %{buildroot}
 %manifest %{name}.manifest
 %defattr(-,root,root)
 %doc AUTHORS README
-#%license COPYING
+%license COPYING
 %{_libexecdir}/at-spi2/at-spi-bus-launcher
 %{_libexecdir}/at-spi2/at-spi2-registryd
 %config %{_sysconfdir}/at-spi2/accessibility.conf
 %{_sysconfdir}/xdg/autostart/at-spi-dbus-bus.desktop
 %{_datadir}/dbus-1/accessibility-services/org.a11y.atspi.Registry.service
 %{_datadir}/dbus-1/services/org.a11y.Bus.service
-%{_datadir}/usr/share/license/%{name}
 
 %files -n libatspi0
 %manifest %{name}.manifest
@@ -124,4 +121,3 @@ rm -fr %{buildroot}
 %{_includedir}/at-spi-2.0
 %{_libdir}/libatspi.so
 %{_libdir}/pkgconfig/atspi-2.pc
-
