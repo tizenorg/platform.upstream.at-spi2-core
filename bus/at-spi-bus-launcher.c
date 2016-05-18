@@ -677,13 +677,12 @@ _terminate_screen_reader(A11yBusLauncher *bl)
      }
 
    LOGD("terminate process with pid %d", bl->pid);
-   if (!aul_terminate_pid(bl->pid))
+   if (aul_terminate_pid(bl->pid) > -1)
      {
         bl->pid = 0;
         return TRUE;
      }
 
-   LOGD("Unable to terminate process using aul api. Sending SIGTERM signal");
    ret = kill(bl->pid, SIGTERM);
    if (!ret)
      {
