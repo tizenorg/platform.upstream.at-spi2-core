@@ -663,6 +663,7 @@ _terminate_screen_reader(A11yBusLauncher *bl)
 {
    LOGD("Terminating screen reader");
    int ret;
+   int ret_aul;
    if (bl->pid <= 0)
      return FALSE;
 
@@ -677,11 +678,15 @@ _terminate_screen_reader(A11yBusLauncher *bl)
      }
 
    LOGD("terminate process with pid %d", bl->pid);
-   if (!aul_terminate_pid(bl->pid))
+   ret_aul = aul_terminate_pid(bl->pid);
+   if (ret_aul >= 0)
      {
+        LOGD("Terminating with aul_terminate_pid: return is %d", ret_aul);
         bl->pid = 0;
         return TRUE;
      }
+   else
+     LOGD("aul_terminate_pid failed: return is %d", ret_aul);
 
    LOGD("Unable to terminate process using aul api. Sending SIGTERM signal");
    ret = kill(bl->pid, SIGTERM);
