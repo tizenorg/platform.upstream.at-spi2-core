@@ -1,6 +1,6 @@
 CLEANFILES=
 
-busconfigdir = $(datadir)/defaults/at-spi2
+busconfigdir = $(sysconfdir)/at-spi2
 busconfig_DATA = accessibility.conf
 
 libexec_PROGRAMS = at-spi-bus-launcher

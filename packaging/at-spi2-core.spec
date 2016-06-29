@@ -2,13 +2,13 @@
 %bcond_with x
 
 Name: at-spi2-core
-Version: 2.16.1
+Version: 2.21.2
 Release: 0
 Summary: Assistive Technology Service Provider Interface - D-Bus based implementation
 License: LGPL-2.0+
 Group: System/Libraries
 Url: http://www.gnome.org/
-Source: http://ftp.gnome.org/pub/GNOME/sources/at-spi2-core/2.16/%{name}-%{version}.tar.xz
+Source: http://ftp.gnome.org/pub/GNOME/sources/at-spi2-core/2.21/%{name}-%{version}.tar.xz
 Source1001:    %{name}.manifest
 Requires:      dbus
 BuildRequires: python-devel
@@ -105,6 +105,7 @@ rm -fr %{buildroot}
 %{_sysconfdir}/xdg/autostart/at-spi-dbus-bus.desktop
 %{_datadir}/dbus-1/accessibility-services/org.a11y.atspi.Registry.service
 %{_datadir}/dbus-1/services/org.a11y.Bus.service
+%{_libdir}/systemd/user/at-spi-dbus-bus.service
 
 %files -n libatspi0
 %manifest %{name}.manifest
