@@ -105,6 +105,7 @@ rm -fr %{buildroot}
 %{_sysconfdir}/xdg/autostart/at-spi-dbus-bus.desktop
 %{_datadir}/dbus-1/accessibility-services/org.a11y.atspi.Registry.service
 %{_datadir}/dbus-1/services/org.a11y.Bus.service
+%{_libdir}/systemd/user/at-spi-dbus-bus.service
 
 %files -n libatspi0
 %manifest %{name}.manifest
