@@ -1,6 +1,6 @@
 /* -*- mode: c; c-basic-offset: 2; indent-tabs-mode: nil; -*-
- * 
- * at-spi-bus-launcher: Manage the a11y bus as a child process 
+ *
+ * at-spi-bus-launcher: Manage the a11y bus as a child process
  *
  * Copyright 2011 Red Hat, Inc.
  *
@@ -81,6 +81,7 @@ typedef struct {
   GSettings *a11y_schema;
   GSettings *interface_schema;
 
+  GDBusProxy *client_proxy;
   int launch_screen_reader_repeats;
   gboolean screen_reader_needed;
   int pid;
@@ -111,6 +112,133 @@ static const gchar introspection_xml[] =
 static GDBusNodeInfo *introspection_data = NULL;
 
 static void
+respond_to_end_session (GDBusProxy *proxy)
+{
+  GVariant *parameters;
+
+  parameters = g_variant_new ("(bs)", TRUE, "");
+
+  g_dbus_proxy_call (proxy,
+                     "EndSessionResponse", parameters,
+                     G_DBUS_CALL_FLAGS_NONE,
+                     -1, NULL, NULL, NULL);
+}
+
+static void
+g_signal_cb (GDBusProxy *proxy,
+             gchar      *sender_name,
+             gchar      *signal_name,
+             GVariant   *parameters,
+             gpointer    user_data)
+{
+  A11yBusLauncher *app = user_data;
+
+  if (g_strcmp0 (signal_name, "QueryEndSession") == 0)
+    respond_to_end_session (proxy);
+  else if (g_strcmp0 (signal_name, "EndSession") == 0)
+    respond_to_end_session (proxy);
+  else if (g_strcmp0 (signal_name, "Stop") == 0)
+    g_main_loop_quit (app->loop);
+}
+
+static void
+client_proxy_ready_cb (GObject      *source_object,
+                       GAsyncResult *res,
+                       gpointer      user_data)
+{
+  A11yBusLauncher *app = user_data;
+  GError *error = NULL;
+
+  app->client_proxy = g_dbus_proxy_new_for_bus_finish (res, &error);
+
+  if (error != NULL)
+    {
+      g_warning ("Failed to get a client proxy: %s", error->message);
+      g_error_free (error);
+
+      return;
+    }
+
+  g_signal_connect (app->client_proxy, "g-signal",
+                    G_CALLBACK (g_signal_cb), app);
+}
+
+static void
+register_client (A11yBusLauncher *app)
+{
+  GDBusProxyFlags flags;
+  GDBusProxy *sm_proxy;
+  GError *error;
+  const gchar *app_id;
+  const gchar *autostart_id;
+  gchar *client_startup_id;
+  GVariant *parameters;
+  GVariant *variant;
+  gchar *object_path;
+
+  flags = G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES |
+          G_DBUS_PROXY_FLAGS_DO_NOT_CONNECT_SIGNALS;
+
+  error = NULL;
+  sm_proxy = g_dbus_proxy_new_sync (app->session_bus, flags, NULL,
+                                    "org.gnome.SessionManager",
+                                    "/org/gnome/SessionManager",
+                                    "org.gnome.SessionManager",
+                                    NULL, &error);
+
+  if (error != NULL)
+    {
+      g_warning ("Failed to get session manager proxy: %s", error->message);
+      g_error_free (error);
+
+      return;
+    }
+
+  app_id = "at-spi-bus-launcher";
+  autostart_id = g_getenv ("DESKTOP_AUTOSTART_ID");
+
+  if (autostart_id != NULL)
+    {
+      client_startup_id = g_strdup (autostart_id);
+      g_unsetenv ("DESKTOP_AUTOSTART_ID");
+    }
+  else
+    {
+      client_startup_id = g_strdup ("");
+    }
+
+  parameters = g_variant_new ("(ss)", app_id, client_startup_id);
+  g_free (client_startup_id);
+
+  error = NULL;
+  variant = g_dbus_proxy_call_sync (sm_proxy,
+                                    "RegisterClient", parameters,
+                                    G_DBUS_CALL_FLAGS_NONE,
+                                    -1, NULL, &error);
+
+  g_object_unref (sm_proxy);
+
+  if (error != NULL)
+    {
+      g_warning ("Failed to register client: %s", error->message);
+      g_error_free (error);
+
+      return;
+    }
+
+  g_variant_get (variant, "(o)", &object_path);
+  g_variant_unref (variant);
+
+  flags = G_DBUS_PROXY_FLAGS_DO_NOT_LOAD_PROPERTIES;
+  g_dbus_proxy_new_for_bus (G_BUS_TYPE_SESSION, flags, NULL,
+                            "org.gnome.SessionManager", object_path,
+                            "org.gnome.SessionManager.ClientPrivate",
+                            NULL, client_proxy_ready_cb, app);
+
+  g_free (object_path);
+}
+
+static void
 setup_bus_child (gpointer data)
 {
   A11yBusLauncher *app = data;
@@ -124,7 +252,7 @@ setup_bus_child (gpointer data)
 #ifdef __linux
 #include <sys/prctl.h>
   prctl (PR_SET_PDEATHSIG, 15);
-#endif  
+#endif
 }
 
 /**
@@ -156,7 +284,7 @@ on_bus_exited (GPid     pid,
                gpointer data)
 {
   A11yBusLauncher *app = data;
-  
+
   app->a11y_bus_pid = -1;
   app->state = A11Y_BUS_STATE_ERROR;
   if (app->a11y_launch_error_message == NULL)
@@ -169,7 +297,7 @@ on_bus_exited (GPid     pid,
         app->a11y_launch_error_message = g_strdup_printf ("Bus stopped by signal %d", WSTOPSIG (status));
     }
   g_main_loop_quit (app->loop);
-} 
+}
 
 static gboolean
 ensure_a11y_bus (A11yBusLauncher *app)
@@ -178,15 +306,21 @@ ensure_a11y_bus (A11yBusLauncher *app)
   char *argv[] = { DBUS_DAEMON, NULL, "--nofork", "--print-address", "3", NULL };
   char addr_buf[2048];
   GError *error = NULL;
+  const char *config_path = NULL;
 
   if (app->a11y_bus_pid != 0)
     return FALSE;
-  
-  argv[1] = g_strdup_printf ("--config-file=%s/at-spi2/accessibility.conf", SYSCONFDIR);
+
+  if (g_file_test (SYSCONFDIR"/at-spi2/accessibility.conf", G_FILE_TEST_EXISTS))
+      config_path = "--config-file="SYSCONFDIR"/at-spi2/accessibility.conf";
+  else
+      config_path = "--config-file="DATADIR"/defaults/at-spi2/accessibility.conf";
+
+  argv[1] = config_path;
 
   if (pipe (app->pipefd) < 0)
     g_error ("Failed to create pipe: %s", strerror (errno));
-  
+
   if (!g_spawn_async (NULL,
                       argv,
                       NULL,
@@ -242,7 +376,7 @@ ensure_a11y_bus (A11yBusLauncher *app)
 #endif
 
   return TRUE;
-  
+
  error:
   close (app->pipefd[0]);
   close (app->pipefd[1]);
@@ -379,7 +513,7 @@ handle_set_property  (GDBusConnection       *connection,
   A11yBusLauncher *app = user_data;
   const gchar *type = g_variant_get_type_string (value);
   gboolean enabled;
-  
+
   if (g_strcmp0 (type, "b") != 0)
     {
       g_set_error (error, G_DBUS_ERROR, G_DBUS_ERROR_INVALID_ARGS,
@@ -429,7 +563,7 @@ on_bus_acquired (GDBusConnection *connection,
   A11yBusLauncher *app = user_data;
   GError *error;
   guint registration_id;
-  
+
   if (connection == NULL)
     {
       g_main_loop_quit (app->loop);
@@ -489,7 +623,8 @@ on_name_acquired (GDBusConnection *connection,
                   gpointer         user_data)
 {
   A11yBusLauncher *app = user_data;
-  (void) app;
+
+  register_client (app);
 }
 
 static int sigterm_pipefd[2];
@@ -506,7 +641,7 @@ on_sigterm_pipe (GIOChannel  *channel,
                  gpointer     data)
 {
   A11yBusLauncher *app = data;
-  
+
   g_main_loop_quit (app->loop);
 
   return FALSE;
@@ -544,7 +679,7 @@ already_running ()
   bridge_display = XOpenDisplay (NULL);
   if (!bridge_display)
 	      return FALSE;
-      
+
   AT_SPI_BUS = XInternAtom (bridge_display, "AT_SPI_BUS", False);
   XGetWindowProperty (bridge_display,
 		      XDefaultRootWindow (bridge_display),
@@ -758,10 +893,10 @@ main (int    argc,
     {
       if (!strcmp (argv[i], "--launch-immediately"))
         _global_app->launch_immediately = TRUE;
-      else if (sscanf (argv[i], "--a11y=%d", &_global_app->a11y_enabled) == 2)
+      else if (sscanf (argv[i], "--a11y=%d", &_global_app->a11y_enabled) == 1)
         a11y_set = TRUE;
       else if (sscanf (argv[i], "--screen-reader=%d",
-                       &_global_app->screen_reader_enabled) == 2)
+                       &_global_app->screen_reader_enabled) == 1)
         screen_reader_set = TRUE;
     else
       g_error ("usage: %s [--launch-immediately] [--a11y=0|1] [--screen-reader=0|1]", argv[0]);
@@ -828,7 +963,7 @@ main (int    argc,
   if (_global_app->a11y_bus_pid > 0)
     kill (_global_app->a11y_bus_pid, SIGTERM);
 
-  /* Clear the X property if our bus is gone; in the case where e.g. 
+  /* Clear the X property if our bus is gone; in the case where e.g.
    * GDM is launching a login on an X server it was using before,
    * we don't want early login processes to pick up the stale address.
    */

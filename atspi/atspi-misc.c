@@ -136,7 +136,7 @@ static void
 cleanup ()
 {
   GHashTable *refs;
-  GList *l;
+  gint i;
 
   refs = live_refs;
   live_refs = NULL;
@@ -154,14 +154,15 @@ cleanup ()
 
   if (!desktop)
     return;
-  for (l = desktop->children; l;)
+
+  /* TODO: Do we need this code, or should we just dispose the desktop? */
+  for (i = desktop->children->len - 1; i >= 0; i--)
   {
-    GList *next = l->next;
-    AtspiAccessible *child = l->data;
+    AtspiAccessible *child = g_ptr_array_index (desktop->children, i);
     g_object_run_dispose (G_OBJECT (child->parent.app));
     g_object_run_dispose (G_OBJECT (child));
-    l = next;
   }
+
   g_object_run_dispose (G_OBJECT (desktop->parent.app));
   g_object_unref (desktop);
   desktop = NULL;
@@ -200,7 +201,8 @@ handle_get_bus_address (DBusPendingCall *pending, void *user_data)
       }
       else
       {
-        g_warning ("Unable to open bus connection: %s", error.message);
+        if (!strcmp (error.name, DBUS_ERROR_FILE_NOT_FOUND))
+          g_warning ("Unable to open bus connection: %s", error.message);
         dbus_error_free (&error);
       }
     }
@@ -277,7 +279,7 @@ ref_accessible (const char *app_name, const char *path)
     {
       app->root = _atspi_accessible_new (app, atspi_path_root);
       app->root->accessible_parent = atspi_get_desktop (0);
-      app->root->accessible_parent->children = g_list_append (app->root->accessible_parent->children, g_object_ref (app->root));
+      g_ptr_array_add (app->root->accessible_parent->children, g_object_ref (app->root));
     }
     return g_object_ref (app->root);
   }
@@ -423,6 +425,8 @@ add_accessible_from_iter (DBusMessageIter *iter)
   AtspiAccessible *accessible;
   const char *name, *description;
   dbus_uint32_t role;
+  gboolean children_cached = FALSE;
+  dbus_int32_t count, index;
 
   dbus_message_iter_recurse (iter, &iter_struct);
 
@@ -441,19 +445,40 @@ add_accessible_from_iter (DBusMessageIter *iter)
     g_object_unref (accessible->accessible_parent);
   accessible->accessible_parent = ref_accessible (app_name, path);
 
-  /* Get children */
-  while (accessible->children)
+  if (dbus_message_iter_get_arg_type (&iter_struct) == 'i')
   {
-    g_object_unref (accessible->children->data);
-    accessible->children = g_list_remove (accessible->children, accessible->children->data);
+    /* Get index in parent */
+    dbus_message_iter_get_basic (&iter_struct, &index);
+    if (index >= 0 && accessible->accessible_parent)
+    {
+      if (index >= accessible->accessible_parent->children->len)
+        g_ptr_array_set_size (accessible->accessible_parent->children, index + 1);
+      g_ptr_array_index (accessible->accessible_parent->children, index) = g_object_ref (accessible);
+    }
+
+    /* get child count */
+    dbus_message_iter_next (&iter_struct);
+    dbus_message_iter_get_basic (&iter_struct, &count);
+    if (count >= 0)
+    {
+      g_ptr_array_set_size (accessible->children, count);
+      children_cached = TRUE;
+    }
   }
-  dbus_message_iter_recurse (&iter_struct, &iter_array);
-  while (dbus_message_iter_get_arg_type (&iter_array) != DBUS_TYPE_INVALID)
+  else if (dbus_message_iter_get_arg_type (&iter_struct) == 'a')
   {
-    AtspiAccessible *child;
-    get_reference_from_iter (&iter_array, &app_name, &path);
-    child = ref_accessible (app_name, path);
-    accessible->children = g_list_append (accessible->children, child);
+    /* It's the old API with a list of children */
+    /* TODO: Perhaps remove this code eventually */
+    dbus_message_iter_recurse (&iter_struct, &iter_array);
+    while (dbus_message_iter_get_arg_type (&iter_array) != DBUS_TYPE_INVALID)
+    {
+      AtspiAccessible *child;
+      get_reference_from_iter (&iter_array, &app_name, &path);
+      child = ref_accessible (app_name, path);
+      g_ptr_array_remove (accessible->children, child);
+      g_ptr_array_add (accessible->children, child);
+    }
+    children_cached = TRUE;
   }
 
   /* interfaces */
@@ -486,7 +511,8 @@ add_accessible_from_iter (DBusMessageIter *iter)
   _atspi_accessible_add_cache (accessible, ATSPI_CACHE_NAME | ATSPI_CACHE_ROLE |
                                ATSPI_CACHE_PARENT | ATSPI_CACHE_DESCRIPTION);
   if (!atspi_state_set_contains (accessible->states,
-                                       ATSPI_STATE_MANAGES_DESCENDANTS))
+                                       ATSPI_STATE_MANAGES_DESCENDANTS) &&
+                                       children_cached)
     _atspi_accessible_add_cache (accessible, ATSPI_CACHE_CHILDREN);
 
   /* This is a bit of a hack since the cache holds a ref, so we don't need
@@ -504,9 +530,16 @@ handle_get_items (DBusPendingCall *pending, void *user_data)
   {
     const char *sender = dbus_message_get_sender (reply);
     const char *error = NULL;
-    dbus_message_get_args (reply, NULL, DBUS_TYPE_STRING, &error,
-                           DBUS_TYPE_INVALID);
-    g_warning ("AT-SPI: Error in GetItems, sender=%s, error=%s", sender, error);
+    if (!strcmp (dbus_message_get_error_name (reply),
+                 DBUS_ERROR_SERVICE_UNKNOWN))
+    {
+    }
+    else
+    {
+      dbus_message_get_args (reply, NULL, DBUS_TYPE_STRING, &error,
+                             DBUS_TYPE_INVALID);
+      g_warning ("AT-SPI: Error in GetItems, sender=%s, error=%s", sender, error);
+    }
     dbus_message_unref (reply);
     dbus_pending_call_unref (pending);
     return;
@@ -573,12 +606,13 @@ ref_accessible_desktop (AtspiApplication *app)
     get_reference_from_iter (&iter_array, &app_name, &path);
     add_app_to_desktop (desktop, app_name);
   }
-  dbus_message_unref (reply);
 
   /* Record the alternate name as an alias for org.a11y.atspi.Registry */
   bus_name_dup = g_strdup (dbus_message_get_sender (reply));
   if (bus_name_dup)
     g_hash_table_insert (app_hash, bus_name_dup, app);
+
+  dbus_message_unref (reply);
 
   return g_object_ref (desktop);
 }
@@ -664,17 +698,19 @@ _atspi_dbus_return_hyperlink_from_iter (DBusMessageIter *iter)
   return ref_hyperlink (app_name, path);
 }
 
-const char *cache_signal_type = "((so)(so)(so)a(so)assusau)";
+const char *cache_signal_type = "((so)(so)(so)iiassusau)";
+const char *old_cache_signal_type = "((so)(so)(so)a(so)assusau)";
 
 static DBusHandlerResult
 handle_add_accessible (DBusConnection *bus, DBusMessage *message, void *user_data)
 {
   DBusMessageIter iter;
+  const char *signature = dbus_message_get_signature (message);
 
-  if (strcmp (dbus_message_get_signature (message), cache_signal_type) != 0)
+  if (strcmp (signature, cache_signal_type) != 0 &&
+      strcmp (signature, old_cache_signal_type) != 0)
   {
-    g_warning ("AT-SPI: AddAccessible with unknown signature %s\n",
-               dbus_message_get_signature (message));
+    g_warning ("AT-SPI: AddAccessible with unknown signature %s\n", signature);
     return DBUS_HANDLER_RESULT_HANDLED;
   }
 
@@ -1561,7 +1597,8 @@ atspi_get_a11y_bus (void)
 
   if (!a11y_bus)
     {
-      g_warning ("Couldn't connect to accessibility bus: %s", error.message);
+      if (!g_getenv("SSH_CONNECTION"))
+        g_warning ("Couldn't connect to accessibility bus: %s", error.message);
       dbus_error_free (&error);
       return NULL;
     }

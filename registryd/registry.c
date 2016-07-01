@@ -146,7 +146,7 @@ find_index_of_reference (GPtrArray *arr, const gchar *name, const gchar * path, 
 
   for (i = 0; i < arr->len; i++)
     {
-      if (compare_reference (ref, g_ptr_array_index (arr, i)));
+      if (compare_reference (ref, g_ptr_array_index (arr, i)))
         {
           found = TRUE;
           break;
